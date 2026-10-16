@@ -1,0 +1,20 @@
+# Temporary public demonstration. No databases, disks or paid resources.
+services:
+  - type: web
+    name: botamedical
+    runtime: node
+    plan: free
+    buildCommand: npm ci --ignore-scripts --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: '1'
+      - key: BOTA_PUBLIC_DEMO
+        value: '1'
+      - key: BOTA_DATA_DIR
+        value: /tmp/bota-public-demo
+      - key: BOTA_BIND_HOST
+        value: 0.0.0.0
