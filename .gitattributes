@@ -1,0 +1,9 @@
+* text=auto eol=lf
+# Preserve the reviewed skill/reference bytes and their recorded checksums.
+AGENTS.md -text
+.agents/skills/** -text
+docs/agent-guides/** -text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
