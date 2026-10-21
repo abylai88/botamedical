@@ -5,3 +5,9 @@ node_modules/
 !.env.example
 *.tsbuildinfo
 test-results/
+*.sqlite
+*.sqlite-*
+order-key
+models/
+__pycache__/
+*.blend1

@@ -7,6 +7,7 @@ export const productSchema = z.object({
   price: z.number().int().min(1).max(100_000_000), sizes: options, colors: options,
   images: z.array(z.string().regex(/^\/(?:images\/[a-z0-9-]+\.webp|media\/[a-f0-9-]{36}\.webp)$/)).max(8),
   active: z.boolean(), revision: z.number().int().min(0),
+  nameEn: text(0, 120).optional(), descriptionEn: text(0, 3000).optional(), categoryEn: text(0, 60).optional(),
 }).strict();
 export const cartLineSchema = z.object({
   productId: idSchema, size: text(0, 40), color: text(0, 40), quantity: z.number().int().min(1).max(20),
@@ -18,3 +19,10 @@ export const orderSchema = z.object({
   consent: z.literal(true),
 }).strict();
 export const loginSchema = z.object({ username: text(3, 64).transform(s => s.toLowerCase()), password: z.string().min(1).max(128) }).strict();
+// Public comment under a product/look. "website" is a hidden honeypot field that people never fill.
+export const commentSchema = z.object({
+  author: text(2, 60), body: text(2, 1000),
+  website: z.literal('').optional(),
+}).strict();
+export const commentHasLink = (text: string) => /https?:\/\/|www\.|\b[a-z0-9-]+\.(?:ru|com|kz|net|org|io|me|su)\b/i.test(text);
+export const commentStatusSchema = z.object({ status: z.enum(['published', 'hidden']) }).strict();

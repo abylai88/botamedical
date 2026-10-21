@@ -45,9 +45,10 @@ test('public demo works behind an HTTPS host and never accepts private writes', 
       assert.match(response.headers.get('content-security-policy'), /upgrade-insecure-requests/);
       const html = await response.text(); assert.ok(html.includes('BOTA')); assert.ok(!html.includes('scrypt:'));
     }
+    assert.ok((await (await request('/catalog/bota-coat')).text()).includes('новые комментарии не принимаются'));
     const checkout = await request('/checkout'); assert.equal(checkout.status, 200);
     const html = await checkout.text(); assert.ok(html.includes('Пока только знакомство')); assert.ok(!html.includes('name="phone"'));
-    for (const [path, method] of [['/admin', 'GET'], ['/api/admin/products', 'GET'], ['/api/admin/products', 'POST'], ['/api/auth/login', 'POST'], ['/api/auth/logout', 'POST'], ['/api/orders', 'POST'], ['/api/admin/media', 'POST'], ['/media/unknown.webp', 'GET']]) {
+    for (const [path, method] of [['/admin', 'GET'], ['/api/admin/products', 'GET'], ['/api/admin/products', 'POST'], ['/api/auth/login', 'POST'], ['/api/auth/logout', 'POST'], ['/api/orders', 'POST'], ['/api/admin/media', 'POST'], ['/api/products/bota-coat/comments', 'POST'], ['/media/unknown.webp', 'GET']]) {
       const response = await request(path, { method, headers: { origin: `https://${host}`, 'x-bota-request': '1' } });
       assert.equal(response.status, 403, path);
     }

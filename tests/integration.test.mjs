@@ -47,7 +47,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok(missingHtml.includes('Страница не найдена')); assert.match(missingHtml, /name="robots" content="noindex/);
   });
   await t.test('admin direct APIs reject unauthenticated calls and cross-origin mutations', async () => {
-    for (const [path, method] of [['/api/admin/products', 'GET'], ['/api/admin/products', 'POST'], ['/api/admin/products/bota-coat', 'PUT'], ['/api/admin/products/bota-coat', 'DELETE'], ['/api/admin/media', 'POST'], ['/api/admin/orders/' + randomUUID(), 'PATCH']]) assert.equal((await request(path, method, method === 'GET' ? undefined : {})).status, 401);
+    for (const [path, method] of [['/api/admin/products', 'GET'], ['/api/admin/products', 'POST'], ['/api/admin/products/bota-coat', 'PUT'], ['/api/admin/products/bota-coat', 'DELETE'], ['/api/admin/media', 'POST'], ['/api/admin/orders/' + randomUUID(), 'PATCH'], ['/api/admin/comments/' + randomUUID(), 'PATCH'], ['/api/admin/comments/' + randomUUID(), 'DELETE']]) assert.equal((await request(path, method, method === 'GET' ? undefined : {})).status, 401);
     assert.equal((await request('/api/auth/login', 'POST', {}, { headers: { origin: 'https://example.com' } })).status, 403);
     assert.equal((await request('/api/orders', 'POST', {}, { headers: { 'x-bota-request': '' } })).status, 403);
   });
@@ -72,6 +72,23 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/admin/products/' + created.id, 'PUT', update)).status, 409);
     assert.equal((await request('/api/admin/products/' + created.id, 'PUT', { ...update, images: ['https://example.com/image.jpg'] })).status, 400);
     assert.equal(productSchema.safeParse({ ...input, price: -1 }).success, false);
+  });
+  await t.test('site texts, footer info and home photos are editable by the admin only', async () => {
+    const body = { texts: { ru: { 'home.title': 'Новый <b>заголовок</b>', 'footer.infoText': 'Алматы, ул. Тестовая, 1' }, en: { 'home.title': 'New headline' } }, images: { hero2: '/images/look-02.webp' } };
+    const saved = cookie; cookie = '';
+    assert.equal((await request('/api/admin/site', 'PUT', body)).status, 401);
+    cookie = saved;
+    assert.equal((await request('/api/admin/site', 'PUT', body, { headers: { origin: 'https://example.com' } })).status, 403);
+    assert.equal((await request('/api/admin/site', 'PUT', { ...body, images: { hero2: 'https://example.com/x.webp' } })).status, 400);
+    assert.equal((await request('/api/admin/site', 'PUT', { ...body, texts: { ...body.texts, ru: { unknown: 'x' } } })).status, 400);
+    assert.equal((await request('/api/admin/site', 'PUT', body)).status, 200);
+    const home = await (await request('/')).text();
+    assert.ok(home.includes('Новый &lt;b&gt;заголовок&lt;/b&gt;')); assert.ok(!home.includes('<b>заголовок</b>'));
+    assert.ok(home.includes('Алматы, ул. Тестовая, 1')); assert.ok(home.includes('₸'));
+    const english = await (await request('/', 'GET', undefined, { headers: { cookie: 'bota_lang=en' } })).text();
+    assert.ok(english.includes('New headline')); assert.ok(english.includes('lang="en"'));
+    assert.equal((await request('/api/admin/site', 'PUT', { texts: { ru: {}, en: {} }, images: {} })).status, 200);
+    assert.ok(!(await (await request('/')).text()).includes('Алматы, ул. Тестовая, 1'));
   });
   await t.test('image upload decodes bytes, rejects active files and persists sanitized WebP', async () => {
     const invalid = await request('/api/admin/media', 'POST', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>'), { raw: true, headers: { 'Content-Type': 'image/png' } });
@@ -104,10 +121,35 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok((await (await request('/admin')).text()).includes(payload.customer.name));
     const anonymous = await fetch(base + '/admin'); assert.ok(!(await anonymous.text()).includes(payload.customer.name));
   });
+  await t.test('comments under each look: public post, validation, staff badge, moderation', async () => {
+    const admin = cookie; cookie = '';
+    const post = (id, body, options) => request(`/api/products/${id}/comments`, 'POST', body, options);
+    const created1 = await post('bota-coat', { author: 'Анна', body: 'Хорошая посадка <b>и</b> ткань' });
+    assert.equal(created1.status, 201); const visitor = await created1.json(); assert.equal(visitor.staff, false); assert.equal(visitor.status, 'published');
+    const html = await (await request('/catalog/bota-coat')).text();
+    assert.ok(html.includes('Хорошая посадка &lt;b&gt;и&lt;/b&gt; ткань')); assert.ok(!html.includes('<b>и</b>'));
+    assert.equal((await post('bota-coat', { author: 'А', body: 'коротко' })).status, 400);
+    assert.equal((await post('bota-coat', { author: 'Спам', body: 'смотри https://example.com' })).status, 400);
+    assert.equal((await post('bota-coat', { author: 'Бот', body: 'текст', website: 'x' })).status, 400);
+    assert.equal((await post('bota-coat', { author: 'Анна', body: 'x'.repeat(1001) })).status, 400);
+    assert.equal((await post('missing-look', { author: 'Анна', body: 'текст' })).status, 404);
+    assert.equal((await post('bota-coat', { author: 'Анна', body: 'текст' }, { headers: { origin: 'https://example.com' } })).status, 403);
+    assert.equal((await request('/api/admin/comments/' + visitor.id, 'PATCH', { status: 'hidden' })).status, 401);
+    cookie = admin;
+    const staff = await post(created.id, { author: 'Команда', body: 'Ответ магазина' }); assert.equal(staff.status, 201); assert.equal((await staff.json()).staff, true);
+    assert.ok((await (await request('/admin')).text()).includes('Хорошая посадка'));
+    assert.equal((await request('/api/admin/comments/' + visitor.id, 'PATCH', { status: 'hidden' })).status, 200);
+    assert.ok(!(await (await request('/catalog/bota-coat')).text()).includes('Хорошая посадка'));
+    assert.equal((await request('/api/admin/comments/' + visitor.id, 'PATCH', { status: 'published' })).status, 200);
+    assert.ok((await (await request('/catalog/bota-coat')).text()).includes('Хорошая посадка'));
+    assert.equal((await request('/api/admin/comments/' + visitor.id, 'DELETE')).status, 200);
+    assert.equal((await request('/api/admin/comments/' + visitor.id, 'DELETE')).status, 404);
+  });
   await t.test('order status, deletion, catalog deletion and revoked sessions', async () => {
     assert.equal((await request('/api/admin/orders/' + savedId, 'PATCH', { status: 'reviewed' })).status, 200); assert.equal(orders()[0].status, 'reviewed');
     assert.equal((await request('/api/admin/orders/' + savedId, 'DELETE')).status, 200); assert.equal(orders().length, 0);
     assert.equal((await request('/api/admin/products/' + created.id, 'DELETE')).status, 200); assert.equal(product(created.id), undefined);
+    assert.equal(db().prepare('SELECT count(*) AS n FROM comments WHERE product_id=?').get(created.id).n, 0, 'Comments go with the product');
     assert.equal((await request('/api/auth/logout', 'POST')).status, 200);
     assert.equal((await request('/api/admin/products')).status, 401); assert.equal(session(cookie.split('=')[1]), null);
   });
@@ -119,7 +161,22 @@ test('server flows, persistence, validation and security boundaries', async t =>
   await t.test('prepared instructions and five originals retain their recorded checksums', async () => {
     const lock = JSON.parse(await readFile('docs/agent-guides/sources.lock.json', 'utf8'));
     for (const entry of lock.upstream_files) assert.equal(digest(await readFile(entry.local_path)), entry.sha256, entry.local_path);
-    for (const entry of lock.project_authored_files) assert.equal(digest(await readFile(entry.local_path || entry.path)), entry.sha256, entry.local_path || entry.path);
+    for (const entry of lock.project_authored_files) {
+      const path = entry.local_path || entry.path;
+      let bytes = await readFile(path);
+      // Next 16.4 appends its own docs-routing block on dev startup. Preserve it,
+      // but still verify every byte of the previously approved BOTA instructions.
+      if (path === 'AGENTS.md') {
+        const marker = bytes.indexOf('\n<!-- BEGIN:nextjs-agent-rules -->');
+        if (marker !== -1) {
+          const suffix = bytes.subarray(marker).toString('utf8');
+          assert.match(suffix, /^\n<!-- BEGIN:nextjs-agent-rules -->\n[\s\S]*<!-- END:nextjs-agent-rules -->\n?$/);
+          assert.equal(suffix.split('<!-- BEGIN:nextjs-agent-rules -->').length, 2);
+          bytes = bytes.subarray(0, marker);
+        }
+      }
+      assert.equal(digest(bytes), entry.sha256, path);
+    }
     const baseline = lock.existing_files_baseline;
     for (const entry of baseline) assert.equal(digest(await readFile(entry.local_path)), entry.sha256, entry.local_path);
   });

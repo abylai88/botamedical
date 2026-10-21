@@ -13,7 +13,7 @@ for (const asset of sources) {
   const original = await readFile(asset.source);
   let pipeline = sharp(original).rotate();
   if (asset.name === 'logo') pipeline = pipeline.extract({ left: 500, top: 270, width: 2640, height: 660 });
-  const copy = await pipeline.resize({ width: asset.width, withoutEnlargement: true }).webp({ quality: asset.name === 'logo' ? 95 : 88 }).toBuffer();
+  const copy = await pipeline.resize({ width: asset.width, withoutEnlargement: true }).webp({ quality: asset.name === 'logo' ? 95 : 92 }).toBuffer();
   const target = `public/images/${asset.name}.webp`;
   await writeFile(target, copy);
   manifest.push({ original: asset.source, originalSha256: createHash('sha256').update(original).digest('hex'), optimized: target, bytes: copy.length });

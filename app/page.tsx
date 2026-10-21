@@ -1,16 +1,64 @@
-import { publicDemo } from '@/lib/deployment';
 import Link from 'next/link';
-import Image from 'next/image';
-import { products } from '@/lib/db';
-import { Gallery } from '@/components/gallery';
+import { product, products } from '@/lib/db';
+import { latestPublished } from '@/lib/comments';
+import { getDictionary } from '@/lib/locale';
+import { localized } from '@/lib/i18n';
+import { getSiteContent, siteImage, siteTexts } from '@/lib/site';
 import { ProductCard } from '@/components/product-card';
-export default function Home() {
+import { ProductImage } from '@/components/product-image';
+
+export default async function Home() {
+  const { locale, t } = await getDictionary(); const h = t.home;
+  const content = getSiteContent(); const text = siteTexts(locale, content); const photo = (key: Parameters<typeof siteImage>[0]) => siteImage(key, content);
   const catalog = products();
-  const looks = catalog.filter(p => p.id !== 'bota-coat');
-  const preview = (looks.length ? looks : catalog).slice(0, 3);
-  return <><section className="hero"><div className="hero-copy"><p className="hero-intro">BOTA Group / Медицинская одежда</p><h1>Форма вашей<br/>профессии.</h1><p className="hero-description">Чистые линии. Сдержанный образ.<br/>В центре внимания — вы.</p><Link href="/catalog" className="button">Открыть каталог <span aria-hidden="true">↗</span></Link><div className="hero-footnote"><span className="line-mark" aria-hidden="true"/><p>Рассмотрите халат в деталях.<br/>Нажмите на фотографию, чтобы увеличить.</p></div></div><Gallery hero images={['/images/coat.webp']} name="Халат BOTA" /></section>
-    <section className="section catalog-preview"><div className="section-heading"><div><p className="section-kicker">Знакомство с коллекцией</p><h2>Ваша следующая форма</h2></div><Link className="text-link" href="/catalog">Весь каталог <span aria-hidden="true">↗</span></Link></div><p className="demo-note">Карточки созданы для знакомства с магазином. Названия и цены — демонстрационные.</p><div className="product-grid">{preview.map(p => <ProductCard key={p.id} product={p} />)}</div>{!catalog.length ? <p className="empty">Каталог готовится. Загляните позже.</p> : null}</section>
-    <section id="approach" className="brand-story"><div className="story-photo"><Image src="/images/look-01.webp" alt="Медицинские халаты на моделях — предоставленное изображение BOTA" fill sizes="(max-width: 800px) 100vw, 50vw" /></div><div className="story-copy"><p className="section-kicker">BOTA Group</p><h2>Профессия.<br/>Личность.<br/>Ваш образ.</h2><p>Медицинская одежда — часть того, как вас видят каждый день. Мы начинаем знакомство с BOTA с простого: силуэтов, деталей и фотографий.</p><p className="small">Состав тканей, размерные сетки и условия заказа появятся после подтверждения данных брендом.</p><Link href="/catalog" className="text-link">Рассмотреть модели</Link></div></section>
-    <section className="section order-story"><div><p className="section-kicker">От выбора к заказу</p><h2>Попробуйте магазин<br/>в действии</h2></div><ol className="order-steps"><li><span>01</span><div><h3>Выберите модель</h3><p>Откройте карточку и рассмотрите фотографию крупнее.</p></div></li><li><span>02</span><div><h3>Соберите корзину</h3><p>Измените количество и проверьте итоговую сумму.</p></div></li><li><span>03</span><div><h3>{publicDemo() ? "Оцените свой выбор" : "Сохраните тестовый заказ"}</h3><p>{publicDemo() ? "В публичной демонстрации можно собрать корзину. Заказы и оплата пока недоступны." : "Заказ появится в локальной панели управления. Оплата не списывается."}</p></div></li></ol></section>
+  const lineup = [photo('hero1'), photo('hero2'), photo('hero3')]; const heroBg = content.images.heroBg;
+  const reviews = latestPublished(3).map(c => ({ ...c, product: product(c.productId) })).filter(c => c.product?.active);
+  const date = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'ru-RU', { dateStyle: 'long', timeZone: 'Europe/Moscow' });
+  const tape = locale === 'en' ? ['Lab coats', 'Looks', 'Team orders'] : ['Халаты', 'Образы', 'Заказы для команды'];
+  return <>
+    <section className={heroBg ? 'hero-team has-photo' : 'hero-team'} aria-labelledby="hero-title">
+      <div className="hero-backdrop" aria-hidden="true">{heroBg ? <ProductImage src={heroBg} alt="" priority quality={90} sizes="100vw" /> : null}<span className="hero-wordmark" /></div>
+      <div className="hero-team-copy">
+        <p className="eyebrow">{text('home.kicker')}</p>
+        <h1 id="hero-title">{text('home.title')}</h1>
+        <p className="hero-lead">{text('home.lead')}</p>
+        <div className="hero-ctas"><Link href="/catalog?category=Халаты" className="button">{text('home.shopCoats')}</Link><Link href="/catalog?category=Образы" className="button secondary">{text('home.shopLooks')}</Link></div>
+      </div>
+      <div className="hero-lineup" role="img" aria-label={h.lineupAlt}>
+        {lineup.map((src, i) => <div key={i} className={`lineup-figure lineup-${i + 1}`}><ProductImage src={src} alt="" priority={i === 1} quality={90} sizes="(max-width: 760px) 70vw, 24vw" />{i === 1 ? <span className="hang-tag" aria-hidden="true"><span className="mark-camel" /><span>BOTA</span></span> : null}</div>)}
+      </div>
+    </section>
+
+    <div className="brand-tape" aria-hidden="true"><div>{Array.from({ length: 6 }, (_, i) => <span key={i}><span className="mark-camel" />{tape[i % tape.length]}</span>)}</div></div>
+
+    <section className="section category-tiles" aria-label={h.categories}>
+      <Link href="/catalog?category=Халаты" className="category-tile tile-coat"><span className="tile-photo"><ProductImage src={photo('tileCoats')} alt="" quality={90} sizes="(max-width: 760px) 100vw, 50vw" /></span><span className="tile-copy"><strong>{text('home.coatsTile')}</strong><span>{text('home.coatsText')}</span><em>{h.categoryCta} <span aria-hidden="true">→</span></em></span></Link>
+      <Link href="/catalog?category=Образы" className="category-tile tile-looks"><span className="tile-photo"><ProductImage src={photo('tileLooks')} alt="" quality={90} sizes="(max-width: 760px) 100vw, 50vw" /></span><span className="tile-copy"><strong>{text('home.looksTile')}</strong><span>{text('home.looksText')}</span><em>{h.categoryCta} <span aria-hidden="true">→</span></em></span></Link>
+    </section>
+
+    <section id="collection" className="section popular">
+      <div className="section-heading"><h2>{text('home.popular')}</h2><Link className="text-link" href="/catalog">{h.all}</Link></div>
+      {catalog.length ? <div className="product-grid popular-grid">{catalog.slice(0, 4).map(p => <ProductCard key={p.id} product={p} locale={locale} />)}</div> : <p className="empty">{h.empty}</p>}
+    </section>
+
+    <section className="team-band" aria-labelledby="team-title">
+      <span className="team-camel" aria-hidden="true" />
+      <div className="team-copy"><p className="eyebrow">{text('home.teamKicker')}</p><h2 id="team-title">{text('home.teamTitle')}</h2><p>{text('home.teamText')}</p><Link href="/catalog" className="button light">{text('home.teamCta')}</Link></div>
+      <div className="team-ticket" aria-hidden="true">
+        <p className="ticket-head"><span className="ticket-logo" /><span>№ 0124</span></p>
+        {catalog.slice(0, 3).map((p, i) => <p key={p.id} className="ticket-line"><span>{localized(p, locale).name}</span><span>× {[12, 8, 6][i]}</span></p>)}
+        <p className="ticket-foot"><span>{locale === 'en' ? 'Department order' : 'Заказ отделения'}</span><span className="ticket-pulse"><svg viewBox="0 0 120 24" preserveAspectRatio="none"><path d="M0 14 H44 L50 14 L54 5 L59 22 L64 2 L69 18 L73 14 H120" /></svg></span></p>
+      </div>
+    </section>
+
+    {reviews.length ? <section className="section reviews" aria-labelledby="reviews-title">
+      <div className="section-heading"><div><p className="eyebrow">{h.reviews}</p><h2 id="reviews-title">{text('home.reviewsLead')}</h2></div></div>
+      <div className="review-grid">{reviews.map(r => <figure key={r.id} className="review"><blockquote>{r.body}</blockquote><figcaption><strong>{r.author}</strong>{r.staff ? <span className="comment-badge">BOTA</span> : null}<span><Link href={`/catalog/${r.productId}`}>{localized(r.product!, locale).name}</Link>, <time dateTime={r.createdAt}>{date.format(new Date(r.createdAt))}</time></span></figcaption></figure>)}</div>
+    </section> : null}
+
+    <section id="approach" className="editorial-brand">
+      <div className="editorial-brand-image"><ProductImage src={photo('brand')} alt={h.brandAlt} quality={90} sizes="(max-width: 760px) 100vw, 55vw" /></div>
+      <div className="editorial-brand-copy"><span className="brand-camel" aria-hidden="true" /><p className="eyebrow">{text('home.brandKicker')}</p><h2>{text('home.brandTitle')}</h2><p>{text('home.brandText')}</p><Link href="/catalog" className="text-link">{text('home.brandCta')}</Link></div>
+    </section>
   </>;
 }

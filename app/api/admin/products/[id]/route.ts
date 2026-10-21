@@ -3,6 +3,7 @@ import { db, product } from '@/lib/db';
 import { authorize, mutation, jsonBody, json, failure, HttpError } from '@/lib/http';
 import { idSchema, productSchema } from '@/lib/validation';
 import { validateImages } from '@/lib/media';
+import { deleteProductComments } from '@/lib/comments';
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     authorize(request); mutation(request);
@@ -19,6 +20,6 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     authorize(request); mutation(request); const id = idSchema.parse((await params).id);
     if (!product(id)) throw new HttpError(404, 'Товар не найден.');
-    db().prepare('DELETE FROM products WHERE id=?').run(id); return json({ ok: true });
+    db().prepare('DELETE FROM products WHERE id=?').run(id); deleteProductComments(id); return json({ ok: true });
   } catch (e) { return failure(e); }
 }

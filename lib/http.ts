@@ -33,9 +33,9 @@ export async function limitedBody(request: NextRequest, limit = 32768) {
   }
   return Buffer.concat(chunks);
 }
-export async function jsonBody(request: NextRequest) {
+export async function jsonBody(request: NextRequest, limit?: number) {
   if (!request.headers.get('content-type')?.startsWith('application/json')) throw new HttpError(415, 'Ожидается JSON.');
-  try { return JSON.parse((await limitedBody(request)).toString('utf8')); }
+  try { return JSON.parse((await limitedBody(request, limit)).toString('utf8')); }
   catch (e) { if (e instanceof HttpError) throw e; throw new HttpError(400, 'Некорректный JSON.'); }
 }
 export function json(value: unknown, status = 200) { return NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store' } }); }

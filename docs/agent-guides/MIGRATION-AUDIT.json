@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-20",
+  "timezone": "Europe/Moscow",
+  "node": "v24.22.0",
+  "npm": "11.19.1",
+  "branch": "main",
+  "head": "d6c5b4107026fc8bc361145889c38d2618c001e6",
+  "initialTrackedModified": [
+    "AGENTS.md",
+    "app/layout.tsx",
+    "app/page.tsx",
+    "app/tokens.css",
+    "components/header.tsx",
+    "package-lock.json",
+    "package.json",
+    "proxy.ts",
+    "tests/integration.test.mjs"
+  ],
+  "initialUntracked": [
+    "app/editorial.css",
+    "components/coat-renderer.ts",
+    "components/coat-story.tsx",
+    "docs/agent-guides/CONTINUATION-STATUS.md",
+    "lib/coat-asset.ts",
+    "lib/coat-story.ts",
+    "models/",
+    "public/images/bota-original.jpeg",
+    "public/images/coat-collar.webp",
+    "public/images/coat-label.webp",
+    "public/images/coat-pockets.webp",
+    "public/images/coat-studio.webp",
+    "public/models/",
+    "scripts/prepare-coat.mjs",
+    "tests/coat-story.test.mjs"
+  ],
+  "versions": {
+    "next": "16.4.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1",
+    "sharp": "0.35.5",
+    "three": "0.186.1",
+    "zod": "4.6.7"
+  },
+  "devVersions": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
+    "typescript": "7.0.2"
+  },
+  "lockAndInstalledVersionsMatch": true,
+  "asset": {
+    "path": "public/models/bota-coat.glb",
+    "bytes": 10296424,
+    "sha256": "433e4c08bd882d1965177a4a5bc83c1fd3195004ca08beadaa8c67920afbe24d",
+    "images": [
+      "BOTA_neck_label_from_photo",
+      "BOTA_weave_normal_v4",
+      "BOTA_weave_white_v4",
+      "BOTA_weave_roughness_v4",
+      "KAZ_BOTA_pocket_label_from_photo"
+    ],
+    "triangles": 309634
+  },
+  "checks": {
+    "build": {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    "tests": {
+      "command": "npm test",
+      "exitCode": 0,
+      "pass": 16,
+      "fail": 0
+    },
+    "browser": {
+      "loadedFabricV4": true,
+      "plusMinusReset": true,
+      "wheelUp": true,
+      "consoleWarningsErrors": 0,
+      "physicalPinch": false
+    },
+    "notRun": [
+      "fresh dependency installation",
+      "Blender regeneration",
+      "npm audit",
+      "physical device tests",
+      "remote hosting checks"
+    ]
+  }
+}

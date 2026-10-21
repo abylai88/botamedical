@@ -20,6 +20,8 @@ export function db() {
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, request_hash TEXT NOT NULL, created TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS media (name TEXT PRIMARY KEY, created TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, product_id TEXT NOT NULL, created TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'published', staff INTEGER NOT NULL DEFAULT 0);
+    CREATE INDEX IF NOT EXISTS comments_product ON comments(product_id, created);
   `);
   connection = database;
   if (!database.prepare('SELECT value FROM meta WHERE key=?').get('seed-v1')) {
@@ -36,6 +38,29 @@ export function db() {
         database.prepare('INSERT INTO products(id,data) VALUES (?,?)').run(product.id, JSON.stringify(product));
       });
       database.prepare('INSERT INTO meta VALUES (?,?)').run('seed-v1', '1');
+      database.exec('COMMIT');
+    } catch (error) { database.exec('ROLLBACK'); throw error; }
+  }
+  if (!database.prepare('SELECT value FROM meta WHERE key=?').get('seed-v2-en')) {
+    // Adds English copy to the original seed cards and drops the old "demo" wording; owner edits are kept.
+    const oldLook = 'Демонстрационная карточка на основе предоставленного снимка. Фото показывает образ целиком; состав комплекта и характеристики необходимо уточнить перед продажей.';
+    const english: Record<string, Pick<Product, 'nameEn' | 'categoryEn' | 'descriptionEn'>> = {
+      'bota-coat': { nameEn: 'BOTA White Lab Coat', categoryEn: 'Lab coats', descriptionEn: 'White BOTA lab coat. Fabric composition, size chart and delivery terms will be added soon.' },
+      'look-01': { nameEn: 'Look with navy set', categoryEn: 'Looks', descriptionEn: 'A complete look: white lab coat over a navy set. Set composition and details will be added soon.' },
+      'look-02': { nameEn: 'Look with colour set', categoryEn: 'Looks', descriptionEn: 'A complete look: white lab coat over a coloured set. Set composition and details will be added soon.' },
+      'look-03': { nameEn: 'Look with blue set', categoryEn: 'Looks', descriptionEn: 'A complete look: white lab coat over a blue set. Set composition and details will be added soon.' },
+    };
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      for (const [id, en] of Object.entries(english)) {
+        const row = database.prepare('SELECT data FROM products WHERE id=?').get(id) as { data: string } | undefined;
+        if (!row) continue;
+        const item = JSON.parse(row.data) as Product;
+        const next: Product = { ...item, nameEn: item.nameEn || en.nameEn, categoryEn: item.categoryEn || en.categoryEn, descriptionEn: item.descriptionEn || en.descriptionEn };
+        if (next.description === oldLook) next.description = 'Образ на основе снимка коллекции: белый халат и комплект. Состав комплекта и характеристики будут добавлены.';
+        database.prepare('UPDATE products SET data=? WHERE id=?').run(JSON.stringify({ ...next, revision: item.revision + 1 }), id);
+      }
+      database.prepare('INSERT INTO meta VALUES (?,?)').run('seed-v2-en', '1');
       database.exec('COMMIT');
     } catch (error) { database.exec('ROLLBACK'); throw error; }
   }

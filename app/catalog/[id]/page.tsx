@@ -1,10 +1,16 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { product } from '@/lib/db';
+import { getDictionary } from '@/lib/locale';
+import { localized } from '@/lib/i18n';
 import { Gallery } from '@/components/gallery';
 import { ProductPurchase } from '@/components/product-purchase';
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) { const p = product((await params).id); return { title: p?.active ? p.name : 'Товар не найден' }; }
+import { ProductComments } from '@/components/product-comments';
+import { productComments } from '@/lib/comments';
+import { publicDemo } from '@/lib/deployment';
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) { const { locale, t } = await getDictionary(); const p = product((await params).id); return { title: p?.active ? localized(p, locale).name : t.product.notFound }; }
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const p = product((await params).id); if (!p || !p.active) notFound();
-  return <div className="section product-page"><p className="breadcrumb"><Link href="/catalog">Каталог</Link> / {p.name}</p><div className="product-layout"><Gallery images={p.images} name={p.name} /><div className="product-details"><p className="section-kicker">{p.category} / Демонстрационная модель</p><h1>{p.name}</h1><p className="description">{p.description || 'Описание пока не добавлено.'}</p><ProductPurchase product={p} /><details open><summary>Что важно знать</summary><p>Карточка создана для тестирования магазина. Цена условная, ассортимент не подтверждён. Добавление в корзину не резервирует товар.</p></details><details><summary>Фотографии и характеристики</summary><p>{p.images.length > 1 ? 'Выберите снимок под основным изображением.' : 'Доступен один снимок. Для полной презентации нужны отдельные фотографии спинки, посадки и ткани.'} Состав и таблица измерений пока не предоставлены.</p></details><details><summary>Оформление заказа</summary><p>Можно сохранить тестовый заказ на этом компьютере. Оплата, доставка и уведомления продавцу пока не подключены.</p><Link href="/info">Подробнее</Link></details></div></div></div>;
+  const { locale, t } = await getDictionary(); const d = t.product; const { name, description, category } = localized(p, locale);
+  return <div className="section product-page"><p className="breadcrumb"><Link href="/catalog">{t.catalog.title}</Link> / <Link href={`/catalog?category=${encodeURIComponent(p.category)}`}>{category}</Link> / {name}</p><div className="product-layout"><Gallery images={p.images} name={name} /><div className="product-details"><p className="eyebrow">{category}</p><h1>{name}</h1><ProductPurchase product={p} />{description ? <p className="description">{description}</p> : null}<details open><summary>{d.important}</summary><p>{d.importantText}</p></details><details><summary>{d.photos}</summary><p>{p.images.length > 1 ? d.photosMany : d.photosOne} {d.specs}</p></details><details><summary>{d.ordering}</summary><p>{d.orderingText}</p><Link href="/info" className="text-link">{d.more}</Link></details></div></div><ProductComments productId={p.id} comments={productComments(p.id)} enabled={!publicDemo()} /></div>;
 }
