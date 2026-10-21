@@ -18,6 +18,7 @@ export function db() {
     CREATE TABLE IF NOT EXISTS admins (username TEXT PRIMARY KEY, password TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, username TEXT NOT NULL REFERENCES admins(username), expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS login_delays (key TEXT PRIMARY KEY, failures INTEGER NOT NULL, next_at INTEGER NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, request_hash TEXT NOT NULL, created TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS media (name TEXT PRIMARY KEY, created TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, product_id TEXT NOT NULL, created TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'published', staff INTEGER NOT NULL DEFAULT 0);
@@ -111,3 +112,21 @@ export function rateLimit(key: string, limit: number, windowMs: number) {
     ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count`).get(digest(key), now + windowMs) as { count: number };
   return row.count <= limit;
 }
+// Progressive delay for one key (a login from one address): the first LOGIN_FREE_FAILURES
+// attempts are free, then each next one waits twice as long, up to 15 minutes. The attempt
+// is reserved before the password check so parallel requests cannot slip through;
+// a successful login removes the key. Returns seconds to wait, or 0 when the attempt may run.
+const LOGIN_FREE_FAILURES = 5;
+export function reserveLoginAttempt(key: string) {
+  const now = Date.now(), hash = digest(key);
+  db().prepare('DELETE FROM login_delays WHERE expires < ?').run(now);
+  const row = db().prepare(`INSERT INTO login_delays(key,failures,next_at,expires) VALUES (?,1,?,?)
+    ON CONFLICT(key) DO UPDATE SET failures=failures+1,
+      next_at=?2 + CASE WHEN failures+1 < ${LOGIN_FREE_FAILURES} THEN 0 ELSE min(900000, 5000 * (1 << min(failures+1-${LOGIN_FREE_FAILURES}, 10))) END,
+      expires=?3
+    WHERE next_at <= ?2 RETURNING failures`).get(hash, now, now + 60 * 60_000) as { failures: number } | undefined;
+  if (row) return 0;
+  const waiting = db().prepare('SELECT next_at FROM login_delays WHERE key=?').get(hash) as { next_at: number } | undefined;
+  return Math.max(1, Math.ceil(((waiting?.next_at ?? now) - now) / 1000));
+}
+export function clearLoginAttempts(key: string) { db().prepare('DELETE FROM login_delays WHERE key=?').run(digest(key)); }

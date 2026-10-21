@@ -12,6 +12,7 @@ process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
 const { db, products, product, orders, digest } = await import('../lib/db.ts');
 const { hashPassword, verifyPassword, session } = await import('../lib/auth.ts');
 const { orderSchema, productSchema } = await import('../lib/validation.ts');
+const { clientIp } = await import('../lib/client-ip.ts');
 const base = 'http://127.0.0.1:3107';
 const password = randomBytes(28).toString('base64url');
 let server, cookie = '', logs = '';
@@ -21,7 +22,7 @@ async function request(path, method = 'GET', body, options = {}) {
 }
 before(async () => {
   db().prepare('INSERT INTO admins VALUES (?,?)').run('qa-admin', await hashPassword(password));
-  server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3107'], { cwd: resolve('.'), env: { ...process.env, APP_ORIGIN: base, NEXT_TELEMETRY_DISABLED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3107'], { cwd: resolve('.'), env: { ...process.env, APP_ORIGIN: base, TRUST_PROXY: '1', NEXT_TELEMETRY_DISABLED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.on('data', chunk => { logs += chunk; }); server.stderr.on('data', chunk => { logs += chunk; });
   for (let i = 0; i < 80; i++) {
     if (server.exitCode !== null) throw new Error('Test server exited: ' + logs);
@@ -158,6 +159,21 @@ test('server flows, persistence, validation and security boundaries', async t =>
     for (let i = 0; i < 5; i++) assert.equal((await request('/api/auth/login', 'POST', { username: 'unknown', password: 'wrong' })).status, 401);
     assert.equal((await request('/api/auth/login', 'POST', { username: 'unknown', password: 'wrong' })).status, 429);
   });
+  await t.test('login limits are per address: one blocked IP does not lock the owner out', async () => {
+    const from = ip => ({ headers: { 'x-forwarded-for': ip } });
+    const login = (username, secret, ip) => request('/api/auth/login', 'POST', { username, password: secret }, from(ip));
+    for (let i = 0; i < 5; i++) assert.equal((await login('qa-admin', 'wrong', '203.0.113.7')).status, 401);
+    const blocked = await login('qa-admin', password, '203.0.113.7');
+    assert.equal(blocked.status, 429, 'Even the right password waits on the blocked address');
+    assert.match((await blocked.json()).error, /сек/);
+    assert.equal((await login('qa-admin', password, '198.51.100.20')).status, 200, 'Owner from another address logs in');
+    // A spoofed earlier hop does not change the address: the proxy-appended last entry counts.
+    assert.equal((await login('qa-admin', password, '198.51.100.99, 203.0.113.7')).status, 429);
+    // One address spraying many usernames hits the per-IP limit; others stay free.
+    for (let i = 0; i < 30; i++) assert.equal((await login('user' + i, 'wrong', '192.0.2.50')).status, 401);
+    assert.equal((await login('user-next', 'wrong', '192.0.2.50')).status, 429);
+    assert.equal((await login('user-next', 'wrong', '192.0.2.51')).status, 401);
+  });
   await t.test('prepared instructions and five originals retain their recorded checksums', async () => {
     const lock = JSON.parse(await readFile('docs/agent-guides/sources.lock.json', 'utf8'));
     for (const entry of lock.upstream_files) assert.equal(digest(await readFile(entry.local_path)), entry.sha256, entry.local_path);
@@ -180,4 +196,13 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const baseline = lock.existing_files_baseline;
     for (const entry of baseline) assert.equal(digest(await readFile(entry.local_path)), entry.sha256, entry.local_path);
   });
+});
+
+test('client address comes from proxy headers only with TRUST_PROXY=1', () => {
+  const headers = new Headers({ 'x-forwarded-for': '1.2.3.4, 10.0.0.9', 'x-real-ip': '5.6.7.8' });
+  assert.equal(clientIp(headers, {}), 'shared', 'Without TRUST_PROXY a spoofable header is ignored');
+  assert.equal(clientIp(headers, { TRUST_PROXY: '1' }), '10.0.0.9');
+  assert.equal(clientIp(new Headers({ 'x-real-ip': '5.6.7.8' }), { TRUST_PROXY: '1' }), '5.6.7.8');
+  assert.equal(clientIp(new Headers({ 'x-forwarded-for': 'not-an-ip' }), { TRUST_PROXY: '1' }), 'shared');
+  assert.equal(clientIp(new Headers(), { TRUST_PROXY: '1' }), 'shared');
 });
