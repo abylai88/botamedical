@@ -9,13 +9,15 @@ import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
 
 process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
-const { db, products, product, orders, digest } = await import('../lib/db.ts');
+const { db, products, product, orders, orderPage, orderCounts, encrypt, digest } = await import('../lib/db.ts');
+const { issueFormToken } = await import('../lib/form-token.ts');
 const { hashPassword, verifyPassword, session } = await import('../lib/auth.ts');
 const { orderSchema, productSchema } = await import('../lib/validation.ts');
 const { clientIp } = await import('../lib/client-ip.ts');
 const base = 'http://127.0.0.1:3107';
 const password = randomBytes(28).toString('base64url');
 let server, cookie = '', logs = '';
+const from = ip => ({ headers: { 'x-forwarded-for': ip } });
 async function request(path, method = 'GET', body, options = {}) {
   const headers = { ...(method !== 'GET' ? { origin: base, 'x-bota-request': '1', 'Content-Type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...options.headers };
   return fetch(base + path, { method, headers, body: body === undefined ? undefined : options.raw ? body : JSON.stringify(body), redirect: 'manual' });
@@ -103,7 +105,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok((await (await request('/catalog/' + id)).text()).includes(url));
   });
   let savedId;
-  const payload = { requestId: randomUUID(), items: [{ productId: 'bota-coat', quantity: 2, size: '', color: '', expectedPrice: 290000 }], customer: { name: 'Тестовый покупатель', phone: '+000 000 0000', email: 'qa@example.test', note: 'Только тест' }, consent: true };
+  const payload = { requestId: randomUUID(), items: [{ productId: 'bota-coat', quantity: 2, size: '', color: '', expectedPrice: 290000 }], customer: { name: 'Тестовый покупатель', phone: '+000 000 0000', email: 'qa@example.test', note: 'Только тест' }, consent: true, website: '', formToken: issueFormToken(Date.now() - 5000) };
   await t.test('server validates quantities, variants, prices, consent and body size', async () => {
     assert.equal((await request('/api/orders', 'POST', { ...payload, consent: false })).status, 400);
     assert.equal((await request('/api/orders', 'POST', { ...payload, items: [{ ...payload.items[0], quantity: -1 }] })).status, 400);
@@ -160,7 +162,6 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/auth/login', 'POST', { username: 'unknown', password: 'wrong' })).status, 429);
   });
   await t.test('login limits are per address: one blocked IP does not lock the owner out', async () => {
-    const from = ip => ({ headers: { 'x-forwarded-for': ip } });
     const login = (username, secret, ip) => request('/api/auth/login', 'POST', { username, password: secret }, from(ip));
     for (let i = 0; i < 5; i++) assert.equal((await login('qa-admin', 'wrong', '203.0.113.7')).status, 401);
     const blocked = await login('qa-admin', password, '203.0.113.7');
@@ -173,6 +174,50 @@ test('server flows, persistence, validation and security boundaries', async t =>
     for (let i = 0; i < 30; i++) assert.equal((await login('user' + i, 'wrong', '192.0.2.50')).status, 401);
     assert.equal((await login('user-next', 'wrong', '192.0.2.50')).status, 429);
     assert.equal((await login('user-next', 'wrong', '192.0.2.51')).status, 401);
+  });
+  await t.test('bot protection: honeypot, too fast or missing form token are dropped quietly', async () => {
+    const before = orderCounts().total;
+    const bot = { ...payload, requestId: randomUUID() };
+    const forged = payload.formToken.slice(0, -1) + (payload.formToken.endsWith('0') ? '1' : '0');
+    for (const body of [{ ...bot, website: 'https://spam.example' }, { ...bot, formToken: issueFormToken() }, { ...bot, formToken: undefined }, { ...bot, formToken: forged }]) {
+      const response = await request('/api/orders', 'POST', body, from('192.0.2.80'));
+      assert.equal(response.status, 201, 'Looks like success to a bot'); assert.ok((await response.json()).id);
+    }
+    assert.equal(orderCounts().total, before, 'Nothing was saved');
+    assert.equal((await request('/api/orders', 'POST', { ...bot, formToken: issueFormToken(Date.now() - 25 * 60 * 60_000) }, from('192.0.2.80'))).status, 400, 'A day-old page asks a person to refresh');
+    assert.equal((await request('/api/orders', 'POST', bot, from('192.0.2.80'))).status, 201);
+    assert.equal(orderCounts().total, before + 1, 'A normal order still goes through');
+  });
+  await t.test('orders are limited to 5 per hour per address', async () => {
+    const order = () => ({ ...payload, requestId: randomUUID() });
+    for (let i = 0; i < 5; i++) assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.90'))).status, 201);
+    assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.90'))).status, 429);
+    assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.91'))).status, 201, 'Another customer is not blocked');
+  });
+  await t.test('admin order pages and the unprocessed tab show every order', async () => {
+    const login = await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.30'));
+    assert.equal(login.status, 200); cookie = login.headers.get('set-cookie').split(';')[0];
+    db().prepare('DELETE FROM orders').run();
+    const insert = (created, status, name) => db().prepare('INSERT INTO orders VALUES (?,?,?,?,?,?)').run(randomUUID(), randomUUID(), 'test', created, status, encrypt({ customer: { name, phone: '+000', email: '', note: '' }, items: [], total: 100 }));
+    insert('2020-01-01T00:00:00.000Z', 'new', 'Старый необработанный');
+    for (let i = 0; i < 45; i++) insert(new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(), 'reviewed', `Обработанный ${i}`);
+    insert('2026-02-01T00:00:00.000Z', 'new', 'Свежий необработанный');
+    const all = orderPage('all', 1);
+    assert.deepEqual([all.total, all.pages, all.orders.length, all.orders[0].customer.name], [47, 3, 20, 'Свежий необработанный']);
+    assert.equal(orderPage('all', 3).orders.length, 7); assert.equal(orderPage('all', 99).page, 3); assert.equal(orderPage('all', -1).page, 1);
+    assert.equal(orderPage('all', 3).orders.at(-1).customer.name, 'Старый необработанный');
+    assert.deepEqual(orderPage('new', 1).orders.map(o => o.customer.name), ['Свежий необработанный', 'Старый необработанный']);
+    const page1 = await (await request('/admin?tab=orders')).text();
+    assert.ok(page1.includes('Страница 1 из 3')); assert.ok(!page1.includes('Старый необработанный'), 'Old order is not on the first page');
+    const page3 = await (await request('/admin?tab=orders&page=3')).text();
+    assert.ok(page3.includes('Страница 3 из 3')); assert.ok(page3.includes('Старый необработанный'));
+    const unprocessed = await (await request('/admin?tab=unprocessed')).text();
+    assert.ok(unprocessed.includes('Старый необработанный'), 'Unprocessed tab shows old orders too'); assert.ok(unprocessed.includes('Свежий необработанный'));
+    assert.ok(!unprocessed.includes('Обработанный 0')); assert.match(unprocessed, /Необработанные \((?:<!-- -->)?2/); assert.match(unprocessed, /Все заказы \((?:<!-- -->)?47/);
+    const old = orderPage('new', 1).orders[1];
+    assert.equal((await request('/api/admin/orders/' + old.id, 'PATCH', { status: 'reviewed' })).status, 200);
+    assert.equal(orderPage('new', 1).total, 1, 'Processed order leaves the tab');
+    assert.ok(!(await (await fetch(base + '/admin?tab=unprocessed')).text()).includes('Свежий необработанный'), 'Anonymous visitors see no orders');
   });
   await t.test('prepared instructions and five originals retain their recorded checksums', async () => {
     const lock = JSON.parse(await readFile('docs/agent-guides/sources.lock.json', 'utf8'));

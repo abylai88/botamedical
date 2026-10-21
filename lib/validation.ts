@@ -17,6 +17,9 @@ export const orderSchema = z.object({
   items: z.array(cartLineSchema.extend({ expectedPrice: z.number().int().positive() })).min(1).max(30),
   customer: z.object({ name: text(2, 100), phone: text(7, 30).refine(s => /^[+\d\s()-]+$/.test(s) && s.replace(/\D/g, '').length >= 7), email: z.union([z.email().max(160), z.literal('')]), note: text(0, 1000) }).strict(),
   consent: z.literal(true),
+  // Bot protection, checked quietly by the server: 'website' is a hidden honeypot field people never fill,
+  // 'formToken' is the signed time the checkout page was rendered.
+  website: z.string().max(1000).optional(), formToken: z.string().max(200).optional(),
 }).strict();
 export const loginSchema = z.object({ username: text(3, 64).transform(s => s.toLowerCase()), password: z.string().min(1).max(128) }).strict();
 // Public comment under a product/look. "website" is a hidden honeypot field that people never fill.

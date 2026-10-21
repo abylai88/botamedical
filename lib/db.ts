@@ -23,6 +23,8 @@ export function db() {
     CREATE TABLE IF NOT EXISTS media (name TEXT PRIMARY KEY, created TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, product_id TEXT NOT NULL, created TEXT NOT NULL, author TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'published', staff INTEGER NOT NULL DEFAULT 0);
     CREATE INDEX IF NOT EXISTS comments_product ON comments(product_id, created);
+    CREATE INDEX IF NOT EXISTS orders_created ON orders(created);
+    CREATE INDEX IF NOT EXISTS orders_status ON orders(status, created);
   `);
   connection = database;
   if (!database.prepare('SELECT value FROM meta WHERE key=?').get('seed-v1')) {
@@ -100,9 +102,25 @@ function decrypt(value: string) {
   decipher.setAuthTag(bytes.subarray(12, 28));
   return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8'));
 }
+type OrderRow = { id: string; created: string; status: Order['status']; payload: string };
+const readOrder = (row: OrderRow): Order => ({ ...decrypt(row.payload), id: row.id, createdAt: row.created, status: row.status });
 export function orders(): Order[] {
-  return (db().prepare('SELECT * FROM orders ORDER BY created DESC LIMIT 200').all() as { id: string; created: string; status: Order['status']; payload: string }[])
-    .map(row => ({ ...decrypt(row.payload), id: row.id, createdAt: row.created, status: row.status }));
+  return (db().prepare('SELECT * FROM orders ORDER BY created DESC LIMIT 200').all() as OrderRow[]).map(readOrder);
+}
+export const ORDERS_PER_PAGE = 20;
+// One page of orders, newest first. 'new' lists every unprocessed order regardless of age.
+export function orderPage(view: 'all' | 'new', requested: number) {
+  const where = view === 'new' ? "WHERE status='new'" : '';
+  const total = (db().prepare(`SELECT count(*) AS n FROM orders ${where}`).get() as { n: number }).n;
+  const pages = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
+  const page = Math.min(pages, Math.max(1, Math.floor(requested) || 1));
+  const rows = db().prepare(`SELECT * FROM orders ${where} ORDER BY created DESC, id LIMIT ? OFFSET ?`).all(ORDERS_PER_PAGE, (page - 1) * ORDERS_PER_PAGE) as OrderRow[];
+  return { view, orders: rows.map(readOrder), total, page, pages };
+}
+// node:sqlite rows have a null prototype; copy into a plain object so it can go to a Client Component.
+export function orderCounts() {
+  const row = db().prepare("SELECT count(*) AS total, count(*) FILTER (WHERE status='new') AS unprocessed FROM orders").get() as { total: number; unprocessed: number };
+  return { total: row.total, unprocessed: row.unprocessed };
 }
 export function digest(value: string) { return createHash('sha256').update(value).digest('hex'); }
 export function rateLimit(key: string, limit: number, windowMs: number) {

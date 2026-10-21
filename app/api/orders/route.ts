@@ -3,12 +3,20 @@ import { NextRequest } from 'next/server';
 import { db, product, encrypt, digest, rateLimit } from '@/lib/db';
 import { mutation, jsonBody, json, failure, HttpError } from '@/lib/http';
 import { clientIp } from '@/lib/client-ip';
+import { checkFormToken } from '@/lib/form-token';
 import { orderSchema } from '@/lib/validation';
 import { lineKey } from '@/lib/types';
 export async function POST(request: NextRequest) {
   try {
     mutation(request);
-    const input = orderSchema.parse(await jsonBody(request));
+    const { website, formToken, ...input } = orderSchema.parse(await jsonBody(request));
+    // Bots get the same answer as a saved order and learn nothing; nothing is stored.
+    const token = checkFormToken(formToken);
+    if (website || token === 'invalid' || token === 'fast') {
+      console.warn('BOTA order dropped as spam:', website ? 'honeypot' : token);
+      return json({ id: randomUUID() }, 201);
+    }
+    if (token === 'expired') throw new HttpError(400, 'Страница оформления устарела. Обновите страницу и отправьте заказ ещё раз.');
     const requestHash = digest(JSON.stringify(input));
     const existing = db().prepare('SELECT id,request_hash FROM orders WHERE request_id=?').get(input.requestId) as { id: string; request_hash: string } | undefined;
     if (existing) {
@@ -25,7 +33,7 @@ export async function POST(request: NextRequest) {
     });
     // Counted only for orders that are about to be saved: retries and rejected carts do not use up the limit.
     if (!rateLimit('orders-global', 300, 10 * 60_000)) throw new HttpError(429, 'Слишком много запросов. Подождите несколько минут.');
-    if (!rateLimit(`orders-ip:${clientIp(request.headers)}`, 20, 10 * 60_000)) throw new HttpError(429, 'Слишком много заказов. Подождите несколько минут.');
+    if (!rateLimit(`orders-ip:${clientIp(request.headers)}`, 5, 60 * 60_000)) throw new HttpError(429, 'Слишком много заказов за час. Напишите нам в WhatsApp или попробуйте позже.');
     const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const id = randomUUID();
     db().prepare('INSERT INTO orders VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, new Date().toISOString(), 'new', encrypt({ customer: input.customer, items, total }));
