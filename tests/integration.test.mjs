@@ -316,6 +316,19 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const lastCursor = (() => { let p = orderPage('all'); while (p.older) { const next = orderPage('all', { after: p.older }); if (!next.older) return p.older; p = next; } })();
     const lastPage = await (await request('/admin?tab=orders&after=' + encodeURIComponent(lastCursor))).text();
     assert.ok(lastPage.includes('Старый необработанный')); assert.ok(lastPage.includes('← Новее'));
+    // A valid cursor whose remaining orders disappeared meanwhile: "end of list", not a jump to the start.
+    // Here: the owner opens page 1 of «Необработанные» while every older order gets processed.
+    const newCursor = orderPage('new').older;
+    const tail = orderPage('new', { after: newCursor }).orders.map(o => o.id);
+    assert.ok(tail.length > 0);
+    for (const id of tail) db().prepare("UPDATE orders SET status='reviewed' WHERE id=?").run(id);
+    const end = orderPage('new', { after: newCursor });
+    assert.deepEqual([end.end, end.orders.length, end.newer, end.older], [true, 0, newCursor, null]);
+    assert.equal(orderPage('new', { before: end.newer }).orders.length, 20, '«← Новее» leads back to a full page');
+    const endHtml = await (await request('/admin?tab=unprocessed&after=' + encodeURIComponent(newCursor))).text();
+    assert.ok(endHtml.includes('Это конец списка')); assert.ok(endHtml.includes('← Новее'));
+    for (const id of tail) db().prepare("UPDATE orders SET status='new' WHERE id=?").run(id);
+    assert.equal(orderPage('all', { after: 'garbage' }).end, false, 'A broken cursor still shows the first page');
     const unprocessed = await (await request('/admin?tab=unprocessed')).text();
     assert.ok(unprocessed.includes('Новый 24'), 'Newest unprocessed order is first');
     assert.ok(!unprocessed.includes('Обработанный 0')); assert.match(unprocessed, /Необработанные \((?:<!-- -->)?\d+/); assert.match(unprocessed, /Все заказы \((?:<!-- -->)?\d+/);

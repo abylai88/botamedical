@@ -133,11 +133,16 @@ export function orderPage(view: OrderView, nav: { after?: string; before?: strin
     if (rows.length < limit) rows = []; // Near the top: show the first page instead of a short one.
   } else if (after) {
     rows = db().prepare(`SELECT * FROM orders ${where} AND ${OLDER} ORDER BY created DESC, id DESC LIMIT ?3`).all(...after, limit) as OrderRow[];
+    // A valid cursor with nothing older (the rest was processed or deleted meanwhile): the end of
+    // the list, with a way back. Only a missing or broken cursor falls back to the first page.
+    if (!rows.length && db().prepare(`SELECT 1 FROM orders ${where} AND ${NEWER} LIMIT 1`).get(...after)) {
+      return { view, orders: [] as Order[], total, newer: nav.after!, older: null, end: true };
+    }
   }
   if (!rows.length) rows = db().prepare(`SELECT * FROM orders ${where} ORDER BY created DESC, id DESC LIMIT ?`).all(limit) as OrderRow[];
   const exists = (side: string, row?: OrderRow) => !!row && !!db().prepare(`SELECT 1 FROM orders ${where} AND ${side} LIMIT 1`).get(row.created, row.id);
   const first = rows[0], last = rows.at(-1);
-  return { view, orders: rows.map(readOrder), total, newer: exists(NEWER, first) ? cursorOf(first!) : null, older: exists(OLDER, last) ? cursorOf(last!) : null };
+  return { view, orders: rows.map(readOrder), total, newer: exists(NEWER, first) ? cursorOf(first!) : null, older: exists(OLDER, last) ? cursorOf(last!) : null, end: false };
 }
 // node:sqlite rows have a null prototype; copy into a plain object so it can go to a Client Component.
 export function orderCounts() {
