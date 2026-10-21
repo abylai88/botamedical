@@ -25,7 +25,8 @@ export function CheckoutForm({ products, formToken }: { products: Product[]; for
       setFields(errors); const first = form.elements.namedItem(Object.keys(errors)[0]); if (first instanceof HTMLElement) first.focus(); return;
     }
     setPending(true);
-    try { const response = await api<{ id: string }>('/api/orders', 'POST', result.data); setOrderId(response.id); clear(); }
+    // The cart is cleared only after the server confirms a saved order; any error keeps it for a retry.
+    try { const response = await api<{ id: string }>('/api/orders', 'POST', result.data); if (!response.id) throw new Error(c.network); setOrderId(response.id); clear(); }
     catch (e) { setError(e instanceof Error ? e.message : c.network); requestAnimationFrame(() => errorRef.current?.focus()); }
     finally { setPending(false); }
   }

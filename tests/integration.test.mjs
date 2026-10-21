@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
 
 process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
-const { db, products, product, orders, orderPage, orderCounts, encrypt, digest } = await import('../lib/db.ts');
+const { db, products, product, orders, orderPage, orderCounts, purgeOldSpam, encrypt, digest } = await import('../lib/db.ts');
 const { issueFormToken } = await import('../lib/form-token.ts');
 const { hashPassword, verifyPassword, session } = await import('../lib/auth.ts');
 const { orderSchema, productSchema } = await import('../lib/validation.ts');
@@ -18,6 +18,9 @@ const base = 'http://127.0.0.1:3107';
 const password = randomBytes(28).toString('base64url');
 let server, cookie = '', logs = '';
 const from = ip => ({ headers: { 'x-forwarded-for': ip } });
+// Form tokens are single-use: every order gets its own, issued a few seconds ago.
+let tokenSeq = 0, spamId;
+const freshToken = () => issueFormToken(Date.now() - 5000 - tokenSeq++);
 async function request(path, method = 'GET', body, options = {}) {
   const headers = { ...(method !== 'GET' ? { origin: base, 'x-bota-request': '1', 'Content-Type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...options.headers };
   return fetch(base + path, { method, headers, body: body === undefined ? undefined : options.raw ? body : JSON.stringify(body), redirect: 'manual' });
@@ -105,7 +108,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok((await (await request('/catalog/' + id)).text()).includes(url));
   });
   let savedId;
-  const payload = { requestId: randomUUID(), items: [{ productId: 'bota-coat', quantity: 2, size: '', color: '', expectedPrice: 290000 }], customer: { name: 'Тестовый покупатель', phone: '+000 000 0000', email: 'qa@example.test', note: 'Только тест' }, consent: true, website: '', formToken: issueFormToken(Date.now() - 5000) };
+  const payload = { requestId: randomUUID(), items: [{ productId: 'bota-coat', quantity: 2, size: '', color: '', expectedPrice: 290000 }], customer: { name: 'Тестовый покупатель', phone: '+000 000 0000', email: 'qa@example.test', note: 'Только тест' }, consent: true, website: '', formToken: freshToken() };
   await t.test('server validates quantities, variants, prices, consent and body size', async () => {
     assert.equal((await request('/api/orders', 'POST', { ...payload, consent: false })).status, 400);
     assert.equal((await request('/api/orders', 'POST', { ...payload, items: [{ ...payload.items[0], quantity: -1 }] })).status, 400);
@@ -175,21 +178,58 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await login('user-next', 'wrong', '192.0.2.50')).status, 429);
     assert.equal((await login('user-next', 'wrong', '192.0.2.51')).status, 401);
   });
-  await t.test('bot protection: honeypot, too fast or missing form token are dropped quietly', async () => {
-    const before = orderCounts().total;
-    const bot = { ...payload, requestId: randomUUID() };
-    const forged = payload.formToken.slice(0, -1) + (payload.formToken.endsWith('0') ? '1' : '0');
-    for (const body of [{ ...bot, website: 'https://spam.example' }, { ...bot, formToken: issueFormToken() }, { ...bot, formToken: undefined }, { ...bot, formToken: forged }]) {
+  await t.test('bot protection: honeypot and bad tokens go to quarantine, a fast click is asked to retry', async () => {
+    const before = orderCounts();
+    const order = (extra = {}) => ({ ...payload, requestId: randomUUID(), formToken: freshToken(), ...extra });
+    const quarantined = async (body, reason) => {
       const response = await request('/api/orders', 'POST', body, from('192.0.2.80'));
-      assert.equal(response.status, 201, 'Looks like success to a bot'); assert.ok((await response.json()).id);
-    }
-    assert.equal(orderCounts().total, before, 'Nothing was saved');
-    assert.equal((await request('/api/orders', 'POST', { ...bot, formToken: issueFormToken(Date.now() - 25 * 60 * 60_000) }, from('192.0.2.80'))).status, 400, 'A day-old page asks a person to refresh');
-    assert.equal((await request('/api/orders', 'POST', bot, from('192.0.2.80'))).status, 201);
-    assert.equal(orderCounts().total, before + 1, 'A normal order still goes through');
+      assert.equal(response.status, 201, 'Looks like success to a bot');
+      const { id } = await response.json(); const saved = orderPage('spam', 1).orders.find(o => o.id === id);
+      assert.equal(saved?.spamReason, reason); assert.equal(saved.customer.name, payload.customer.name);
+      return id;
+    };
+    const honeypot = await quarantined(order({ website: 'https://spam.example' }), 'honeypot');
+    await quarantined(order({ formToken: undefined }), 'invalid');
+    const forged = freshToken(); await quarantined(order({ formToken: forged.slice(0, -1) + (forged.endsWith('0') ? '1' : '0') }), 'invalid');
+    assert.deepEqual(orderCounts(), { ...before, spam: before.spam + 3 }, 'Spam stays out of all orders and unprocessed');
+    assert.ok(!orderPage('all', 1).orders.some(o => o.id === honeypot)); assert.ok(!orderPage('new', 1).orders.some(o => o.id === honeypot));
+    // A person who submits within 3 seconds sees a clear message and can retry the same order.
+    const quick = order({ formToken: issueFormToken() });
+    const fast = await request('/api/orders', 'POST', quick, from('192.0.2.81'));
+    assert.equal(fast.status, 400); assert.match((await fast.json()).error, /Подождите пару секунд/);
+    assert.equal(orderCounts().spam, before.spam + 3, 'A fast click is not spam');
+    const retry = await request('/api/orders', 'POST', { ...quick, formToken: issueFormToken(Date.now() - 3500) }, from('192.0.2.81'));
+    assert.equal(retry.status, 201); const real = (await retry.json()).id;
+    assert.ok(orderPage('new', 1).orders.some(o => o.id === real));
+    assert.equal((await request('/api/orders', 'POST', order({ formToken: issueFormToken(Date.now() - 25 * 60 * 60_000) }), from('192.0.2.81'))).status, 400, 'A day-old page asks to refresh');
+    spamId = honeypot;
+  });
+  await t.test('a form token places only one order', async () => {
+    const token = freshToken(), first = { ...payload, requestId: randomUUID(), formToken: token };
+    assert.equal((await request('/api/orders', 'POST', first, from('192.0.2.85'))).status, 201);
+    assert.equal((await request('/api/orders', 'POST', first, from('192.0.2.85'))).status, 200, 'Retry of the same order still returns it');
+    const second = await request('/api/orders', 'POST', { ...first, requestId: randomUUID() }, from('192.0.2.85'));
+    assert.equal(second.status, 400); assert.match((await second.json()).error, /Обновите страницу/);
+    assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get(digest(token)).n, 1);
+    db().prepare('INSERT INTO used_form_tokens VALUES (?,?)').run('expired-token', Date.now() - 1);
+    assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.86'))).status, 201);
+    assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get('expired-token').n, 0, 'Expired tokens are cleaned up');
+  });
+  await t.test('quarantine is limited per address and old spam is purged', async () => {
+    const before = orderCounts().spam;
+    for (let i = 0; i < 7; i++) assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.88'))).status, 201);
+    assert.equal(orderCounts().spam, before + 5, 'Only 5 spam orders per hour from one address are stored');
+    assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.89'))).status, 201);
+    assert.equal(orderCounts().spam, before + 6);
+    const insert = (created, status) => { const id = randomUUID(); db().prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, randomUUID(), 'test', created, status, encrypt({ customer: payload.customer, items: [], total: 0 })); return id; };
+    const oldSpam = insert(new Date(Date.now() - 31 * 86_400_000).toISOString(), 'spam');
+    const oldReal = insert(new Date(Date.now() - 400 * 86_400_000).toISOString(), 'new');
+    purgeOldSpam();
+    assert.equal(db().prepare('SELECT count(*) AS n FROM orders WHERE id=?').get(oldSpam).n, 0, 'Spam older than 30 days is removed');
+    assert.equal(db().prepare('SELECT count(*) AS n FROM orders WHERE id=?').get(oldReal).n, 1, 'Old real orders stay');
   });
   await t.test('orders are limited to 5 per hour per address', async () => {
-    const order = () => ({ ...payload, requestId: randomUUID() });
+    const order = () => ({ ...payload, requestId: randomUUID(), formToken: freshToken() });
     for (let i = 0; i < 5; i++) assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.90'))).status, 201);
     assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.90'))).status, 429);
     assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.91'))).status, 201, 'Another customer is not blocked');
@@ -197,6 +237,11 @@ test('server flows, persistence, validation and security boundaries', async t =>
   await t.test('admin order pages and the unprocessed tab show every order', async () => {
     const login = await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.30'));
     assert.equal(login.status, 200); cookie = login.headers.get('set-cookie').split(';')[0];
+    const spamTab = await (await request('/admin?tab=spam')).text();
+    assert.ok(spamTab.includes('Это настоящий заказ')); assert.ok(spamTab.includes('заполнено скрытое поле-ловушка'));
+    assert.match(spamTab, /Спам \((?:<!-- -->)?\d+/);
+    assert.equal((await request('/api/admin/orders/' + spamId, 'PATCH', { status: 'new' })).status, 200, '«Это настоящий заказ» releases it');
+    assert.ok(orderPage('new', 1).orders.some(o => o.id === spamId)); assert.ok(!orderPage('spam', 1).orders.some(o => o.id === spamId));
     db().prepare('DELETE FROM orders').run();
     const insert = (created, status, name) => db().prepare('INSERT INTO orders VALUES (?,?,?,?,?,?)').run(randomUUID(), randomUUID(), 'test', created, status, encrypt({ customer: { name, phone: '+000', email: '', note: '' }, items: [], total: 100 }));
     insert('2020-01-01T00:00:00.000Z', 'new', 'Старый необработанный');

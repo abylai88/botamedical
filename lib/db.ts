@@ -18,6 +18,7 @@ export function db() {
     CREATE TABLE IF NOT EXISTS admins (username TEXT PRIMARY KEY, password TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, username TEXT NOT NULL REFERENCES admins(username), expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS used_form_tokens (hash TEXT PRIMARY KEY, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS login_delays (key TEXT PRIMARY KEY, failures INTEGER NOT NULL, next_at INTEGER NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, request_hash TEXT NOT NULL, created TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS media (name TEXT PRIMARY KEY, created TEXT NOT NULL);
@@ -108,9 +109,16 @@ export function orders(): Order[] {
   return (db().prepare('SELECT * FROM orders ORDER BY created DESC LIMIT 200').all() as OrderRow[]).map(readOrder);
 }
 export const ORDERS_PER_PAGE = 20;
-// One page of orders, newest first. 'new' lists every unprocessed order regardless of age.
-export function orderPage(view: 'all' | 'new', requested: number) {
-  const where = view === 'new' ? "WHERE status='new'" : '';
+export type OrderView = 'all' | 'new' | 'spam';
+// 'all' hides quarantined spam, 'new' lists every unprocessed order regardless of age, 'spam' is the quarantine.
+const VIEW_WHERE: Record<OrderView, string> = { all: "WHERE status!='spam'", new: "WHERE status='new'", spam: "WHERE status='spam'" };
+export const SPAM_KEEP_DAYS = 30;
+export function purgeOldSpam() {
+  db().prepare("DELETE FROM orders WHERE status='spam' AND created < ?").run(new Date(Date.now() - SPAM_KEEP_DAYS * 86_400_000).toISOString());
+}
+// One page of orders, newest first.
+export function orderPage(view: OrderView, requested: number) {
+  const where = VIEW_WHERE[view];
   const total = (db().prepare(`SELECT count(*) AS n FROM orders ${where}`).get() as { n: number }).n;
   const pages = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
   const page = Math.min(pages, Math.max(1, Math.floor(requested) || 1));
@@ -119,8 +127,8 @@ export function orderPage(view: 'all' | 'new', requested: number) {
 }
 // node:sqlite rows have a null prototype; copy into a plain object so it can go to a Client Component.
 export function orderCounts() {
-  const row = db().prepare("SELECT count(*) AS total, count(*) FILTER (WHERE status='new') AS unprocessed FROM orders").get() as { total: number; unprocessed: number };
-  return { total: row.total, unprocessed: row.unprocessed };
+  const row = db().prepare("SELECT count(*) FILTER (WHERE status!='spam') AS total, count(*) FILTER (WHERE status='new') AS unprocessed, count(*) FILTER (WHERE status='spam') AS spam FROM orders").get() as { total: number; unprocessed: number; spam: number };
+  return { total: row.total, unprocessed: row.unprocessed, spam: row.spam };
 }
 export function digest(value: string) { return createHash('sha256').update(value).digest('hex'); }
 export function rateLimit(key: string, limit: number, windowMs: number) {
