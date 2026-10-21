@@ -211,7 +211,11 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/orders', 'POST', first, from('192.0.2.85'))).status, 200, 'Retry of the same order still returns it');
     const second = await request('/api/orders', 'POST', { ...first, requestId: randomUUID() }, from('192.0.2.85'));
     assert.equal(second.status, 400); assert.match((await second.json()).error, /Обновите страницу/);
-    assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get(digest(token)).n, 1);
+    assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get(digest(token.split('.')[1])).n, 1, 'Marked used by its random id');
+    // Two customers whose forms rendered in the same millisecond both get through.
+    const sameMoment = Date.now() - 5000, a = issueFormToken(sameMoment), b = issueFormToken(sameMoment);
+    assert.notEqual(a, b); assert.equal(a.split('.')[0], b.split('.')[0]);
+    for (const [formToken, ip] of [[a, '192.0.2.83'], [b, '192.0.2.84']]) assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken }, from(ip))).status, 201);
     db().prepare('INSERT INTO used_form_tokens VALUES (?,?)').run('expired-token', Date.now() - 1);
     assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.86'))).status, 201);
     assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get('expired-token').n, 0, 'Expired tokens are cleaned up');
