@@ -3,6 +3,7 @@ import { product, rateLimit } from '@/lib/db';
 import { COOKIE, session } from '@/lib/auth';
 import { addComment } from '@/lib/comments';
 import { mutation, jsonBody, json, failure, HttpError } from '@/lib/http';
+import { clientIp } from '@/lib/client-ip';
 import { commentHasLink, commentSchema, idSchema } from '@/lib/validation';
 
 // Visitors leave a comment under a product or look; it appears immediately and
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const input = commentSchema.parse(await jsonBody(request));
     if (input.website) throw new HttpError(400, 'Комментарий не принят.');
     if (commentHasLink(input.body) || commentHasLink(input.author)) throw new HttpError(400, 'Ссылки в комментариях не публикуются.');
-    if (!rateLimit('comments-global', 60, 10 * 60_000) || !rateLimit(`comments:${id}`, 20, 10 * 60_000) || !rateLimit(`comments-author:${input.author.toLowerCase()}`, 5, 10 * 60_000)) {
+    // Per-address limit first: comments it rejects never touch the shared counters below.
+    if (!rateLimit(`comments-ip:${clientIp(request.headers)}`, 5, 10 * 60_000) || !rateLimit(`comments-author:${input.author.toLowerCase()}`, 5, 10 * 60_000) || !rateLimit(`comments:${id}`, 20, 10 * 60_000) || !rateLimit('comments-global', 60, 10 * 60_000)) {
       throw new HttpError(429, 'Слишком много комментариев. Попробуйте через несколько минут.');
     }
     const staff = !!session(request.cookies.get(COOKIE)?.value);

@@ -244,6 +244,14 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok(counter('login-global') < 1000, 'Logins rejected per address are not counted globally');
     assert.equal((await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.40'))).status, 200, 'Owner logs in from another address');
   });
+  await t.test('comments are limited per address before the shared counters', async () => {
+    const counter = key => db().prepare('SELECT count FROM rate_limits WHERE key=?').get(digest(key))?.count ?? 0;
+    const post = (i, ip) => request('/api/products/bota-coat/comments', 'POST', { author: `Гость ${i}`, body: 'Отличная ткань' }, from(ip));
+    for (let i = 0; i < 5; i++) assert.equal((await post(i, '192.0.2.220')).status, 201);
+    for (let i = 5; i < 100; i++) assert.equal((await post(i, '192.0.2.220')).status, 429);
+    assert.ok(counter('comments-global') < 60 && counter('comments:bota-coat') < 20, 'Rejected comments are not counted globally or per product');
+    assert.equal((await post(100, '192.0.2.221')).status, 201, 'Another visitor can still comment');
+  });
   await t.test('admin order pages and the unprocessed tab show every order', async () => {
     const login = await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.30'));
     assert.equal(login.status, 200); cookie = login.headers.get('set-cookie').split(';')[0];
