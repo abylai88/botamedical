@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
     }
     if (formTokenUsed(formToken!)) throw new HttpError(400, refresh);
     // Counted only for orders that are about to be saved: retries and rejected carts do not use up the limit.
-    if (!rateLimit('orders-global', 300, 10 * 60_000)) throw new HttpError(429, 'Слишком много запросов. Подождите несколько минут.');
+    // The address limit goes first: orders it rejects never touch the shared emergency counter.
     if (!rateLimit(`orders-ip:${ip}`, 5, 60 * 60_000)) throw new HttpError(429, 'Слишком много заказов за час. Напишите нам в WhatsApp или попробуйте позже.');
+    if (!rateLimit('orders-global', 300, 10 * 60_000)) throw new HttpError(429, 'Слишком много запросов. Подождите несколько минут.');
     const database = db();
     database.exec('BEGIN IMMEDIATE');
     try {

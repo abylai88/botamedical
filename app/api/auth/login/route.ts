@@ -11,8 +11,7 @@ export async function POST(request: NextRequest) {
     mutation(request);
     const input = loginSchema.parse(await jsonBody(request));
     const ip = clientIp(request.headers);
-    // Emergency brake for a flood from many addresses; normal use never reaches it.
-    if (!rateLimit('login-global', 1000, WINDOW)) throw tooMany();
+    // Order matters: per-address checks first, so requests they reject never touch the shared counters.
     // One address trying many usernames.
     if (!rateLimit(`login-ip:${ip}`, 30, WINDOW)) throw tooMany();
     // One address guessing one username: growing delay. The owner on another address is not affected.
@@ -21,6 +20,8 @@ export async function POST(request: NextRequest) {
     if (wait) throw tooMany(`Подождите ${wait} сек.`);
     // Many addresses guessing one username.
     if (!rateLimit(`login-user-all:${input.username}`, 200, 60 * 60_000)) throw tooMany();
+    // Emergency brake for a flood from many addresses; normal use never reaches it.
+    if (!rateLimit('login-global', 1000, WINDOW)) throw tooMany();
     const admin = db().prepare('SELECT password FROM admins WHERE username=?').get(input.username) as { password: string } | undefined;
     if (!await verifyPassword(input.password, admin?.password)) throw new HttpError(401, 'Неверное имя пользователя или пароль.');
     clearLoginAttempts(attempt);

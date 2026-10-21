@@ -234,6 +234,15 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.90'))).status, 429);
     assert.equal((await request('/api/orders', 'POST', order(), from('192.0.2.91'))).status, 201, 'Another customer is not blocked');
   });
+  await t.test('a flood from one address does not use up the shared emergency limits', async () => {
+    const counter = key => db().prepare('SELECT count FROM rate_limits WHERE key=?').get(digest(key))?.count ?? 0;
+    for (let i = 0; i < 300; i++) await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.200'));
+    assert.ok(counter('orders-global') < 300, 'Orders rejected by the address limit are not counted globally');
+    assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.201'))).status, 201, 'Another customer can still order');
+    for (let i = 0; i < 1000; i++) await request('/api/auth/login', 'POST', { username: 'flood', password: 'wrong' }, from('192.0.2.210'));
+    assert.ok(counter('login-global') < 1000, 'Logins rejected per address are not counted globally');
+    assert.equal((await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.40'))).status, 200, 'Owner logs in from another address');
+  });
   await t.test('admin order pages and the unprocessed tab show every order', async () => {
     const login = await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.30'));
     assert.equal(login.status, 200); cookie = login.headers.get('set-cookie').split(';')[0];
