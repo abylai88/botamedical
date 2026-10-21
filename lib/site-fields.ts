@@ -27,6 +27,8 @@ export const SITE_TEXT_FIELDS = [
   { key: 'footer.infoTitle', group: 'Подвал сайта', label: 'Информационный блок: заголовок', max: 80 },
   { key: 'footer.infoText', group: 'Подвал сайта', label: 'Информационный блок: текст (адрес, телефон, график)', max: 1200, multiline: true, rows: 5 },
   { key: 'footer.note', group: 'Подвал сайта', label: 'Примечание внизу', max: 400, multiline: true },
+  // Shown to a customer when an order cannot be accepted. One number is enough; the Russian value wins.
+  { key: 'contact.whatsapp', group: 'Контакты', label: 'WhatsApp для связи, номер (например, +7 777 123 45 67)', max: 30 },
 ] as const;
 export type SiteTextKey = (typeof SITE_TEXT_FIELDS)[number]['key'];
 export const SITE_TEXT_KEYS = SITE_TEXT_FIELDS.map(f => f.key) as SiteTextKey[];

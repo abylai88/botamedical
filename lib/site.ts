@@ -32,6 +32,11 @@ export function saveSiteContent(input: z.infer<typeof siteSchema>) {
   return content;
 }
 
+// wa.me link for the WhatsApp number from the "Сайт" tab, or null when none is set.
+export function whatsappLink(content = getSiteContent()) {
+  const digits = (content.texts.ru['contact.whatsapp'] || content.texts.en['contact.whatsapp'] || '').replace(/\D/g, '');
+  return digits.length >= 10 && digits.length <= 15 ? `https://wa.me/${digits}` : null;
+}
 export function siteTexts(locale: Locale, content = getSiteContent()) {
   return (key: SiteTextKey) => siteText(content, locale, key);
 }

@@ -24,8 +24,16 @@ const freshToken = () => issueFormToken(Date.now() - 5000 - tokenSeq++);
 const statusOf = id => db().prepare('SELECT status FROM orders WHERE id=?').get(id)?.status;
 async function request(path, method = 'GET', body, options = {}) {
   const headers = { ...(method !== 'GET' ? { origin: base, 'x-bota-request': '1', 'Content-Type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...options.headers };
-  return fetch(base + path, { method, headers, body: body === undefined ? undefined : options.raw ? body : JSON.stringify(body), redirect: 'manual' });
+  const response = await fetch(base + path, { method, headers, body: body === undefined ? undefined : options.raw ? body : JSON.stringify(body), redirect: 'manual' });
+  // Every "order accepted" answer in every test must point at an order that really is in the database.
+  if (path === '/api/orders' && response.status === 201) {
+    const { id } = await response.clone().json();
+    assert.ok(db().prepare('SELECT 1 FROM orders WHERE id=?').get(id), `201 with an order number that is not saved: ${id}`);
+    acceptedOrders++;
+  }
+  return response;
 }
+let acceptedOrders = 0;
 before(async () => {
   db().prepare('INSERT INTO admins VALUES (?,?)').run('qa-admin', await hashPassword(password));
   server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3107'], { cwd: resolve('.'), env: { ...process.env, APP_ORIGIN: base, TRUST_PROXY: '1', NEXT_TELEMETRY_DISABLED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -222,7 +230,15 @@ test('server flows, persistence, validation and security boundaries', async t =>
   });
   await t.test('quarantine is limited per address and old spam is purged', async () => {
     const before = orderCounts().spam;
-    for (let i = 0; i < 7; i++) assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.88'))).status, 201);
+    for (let i = 0; i < 5; i++) assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.88'))).status, 201);
+    // Over the quarantine limit: an honest error with the WhatsApp link from the site settings, never a number.
+    db().prepare('INSERT INTO meta(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run('site-content-v1', JSON.stringify({ texts: { ru: { 'contact.whatsapp': '+7 777 123 45 67' }, en: {} }, images: {} }));
+    for (let i = 0; i < 2; i++) {
+      const full = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.88'));
+      assert.equal(full.status, 429); const body = await full.json();
+      assert.match(body.error, /Не удалось оформить заказ/); assert.equal(body.whatsapp, 'https://wa.me/77771234567'); assert.equal(body.id, undefined);
+    }
+    db().prepare('DELETE FROM meta WHERE key=?').run('site-content-v1');
     assert.equal(orderCounts().spam, before + 5, 'Only 5 spam orders per hour from one address are stored');
     assert.equal((await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), website: 'x' }, from('192.0.2.89'))).status, 201);
     assert.equal(orderCounts().spam, before + 6);
@@ -247,6 +263,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     for (let i = 0; i < 1000; i++) await request('/api/auth/login', 'POST', { username: 'flood', password: 'wrong' }, from('192.0.2.210'));
     assert.ok(counter('login-global') < 1000, 'Logins rejected per address are not counted globally');
     assert.equal((await request('/api/auth/login', 'POST', { username: 'qa-admin', password }, from('198.51.100.40'))).status, 200, 'Owner logs in from another address');
+    assert.ok(acceptedOrders >= 20, 'Every 201 so far was checked against the database');
   });
   await t.test('comments are limited per address before the shared counters', async () => {
     const counter = key => db().prepare('SELECT count FROM rate_limits WHERE key=?').get(digest(key))?.count ?? 0;

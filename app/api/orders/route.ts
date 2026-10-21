@@ -6,7 +6,11 @@ import { clientIp } from '@/lib/client-ip';
 import { checkFormToken, formTokenUsed, markFormTokenUsed } from '@/lib/form-token';
 import { orderSchema } from '@/lib/validation';
 import { lineKey } from '@/lib/types';
+import { whatsappLink } from '@/lib/site';
 const refresh = 'Страница оформления устарела. Обновите страницу и отправьте заказ ещё раз.';
+// Rule for this route: 201 with an id only after the order is written to the database.
+// When it cannot be stored, the customer gets an error and keeps the cart, plus the WhatsApp link.
+const notAccepted = (error = 'Не удалось оформить заказ. Попробуйте позже или напишите нам в WhatsApp.') => json({ error, whatsapp: whatsappLink() }, 429);
 export async function POST(request: NextRequest) {
   try {
     mutation(request);
@@ -35,19 +39,19 @@ export async function POST(request: NextRequest) {
     const ip = clientIp(request.headers);
     const id = randomUUID();
     if (spamReason) {
-      // The bot sees the usual answer. Over the quarantine limits nothing more is stored.
+      // Stored for the owner to review; the bot sees the usual answer. A full quarantine is an error,
+      // because a real customer could also land here and must not get a number for nothing.
       purgeOldSpam();
-      if (rateLimit(`spam-ip:${ip}`, 5, 60 * 60_000) && rateLimit('spam-global', 500, 24 * 60 * 60_000)) {
-        db().prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, new Date().toISOString(), 'spam', encrypt({ customer: input.customer, items, total, spamReason }));
-      }
+      if (!rateLimit(`spam-ip:${ip}`, 5, 60 * 60_000) || !rateLimit('spam-global', 500, 24 * 60 * 60_000)) return notAccepted();
+      db().prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, new Date().toISOString(), 'spam', encrypt({ customer: input.customer, items, total, spamReason }));
       console.warn('BOTA order quarantined as spam:', spamReason);
       return json({ id }, 201);
     }
     if (formTokenUsed(formToken!)) throw new HttpError(400, refresh);
     // Counted only for orders that are about to be saved: retries and rejected carts do not use up the limit.
     // The address limit goes first: orders it rejects never touch the shared emergency counter.
-    if (!rateLimit(`orders-ip:${ip}`, 5, 60 * 60_000)) throw new HttpError(429, 'Слишком много заказов за час. Напишите нам в WhatsApp или попробуйте позже.');
-    if (!rateLimit('orders-global', 300, 10 * 60_000)) throw new HttpError(429, 'Слишком много запросов. Подождите несколько минут.');
+    if (!rateLimit(`orders-ip:${ip}`, 5, 60 * 60_000)) return notAccepted('Слишком много заказов за час. Напишите нам в WhatsApp или попробуйте позже.');
+    if (!rateLimit('orders-global', 300, 10 * 60_000)) return notAccepted();
     const database = db();
     database.exec('BEGIN IMMEDIATE');
     try {
