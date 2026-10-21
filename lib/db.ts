@@ -116,14 +116,28 @@ export const SPAM_KEEP_DAYS = 30;
 export function purgeOldSpam() {
   db().prepare("DELETE FROM orders WHERE status='spam' AND created < ?").run(new Date(Date.now() - SPAM_KEEP_DAYS * 86_400_000).toISOString());
 }
-// One page of orders, newest first.
-export function orderPage(view: OrderView, requested: number) {
-  const where = VIEW_WHERE[view];
+// Pages are anchored to an order ("<created>~<id>") instead of an offset, so orders that arrive
+// or change status between page loads never cause repeats or gaps.
+const CURSOR = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z)~([0-9a-f-]{36})$/;
+const OLDER = '(created < ?1 OR (created = ?1 AND id < ?2))', NEWER = '(created > ?1 OR (created = ?1 AND id > ?2))';
+const cursorOf = (row: OrderRow) => `${row.created}~${row.id}`;
+// One page of orders, newest first: the first page, the page older than `after`, or newer than `before`.
+export function orderPage(view: OrderView, nav: { after?: string; before?: string } = {}) {
+  const where = VIEW_WHERE[view], limit = ORDERS_PER_PAGE;
   const total = (db().prepare(`SELECT count(*) AS n FROM orders ${where}`).get() as { n: number }).n;
-  const pages = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
-  const page = Math.min(pages, Math.max(1, Math.floor(requested) || 1));
-  const rows = db().prepare(`SELECT * FROM orders ${where} ORDER BY created DESC, id LIMIT ? OFFSET ?`).all(ORDERS_PER_PAGE, (page - 1) * ORDERS_PER_PAGE) as OrderRow[];
-  return { view, orders: rows.map(readOrder), total, page, pages };
+  const edge = (cursor?: string) => { const m = CURSOR.exec(cursor || ''); return m ? [m[1], m[2]] : null; };
+  const after = edge(nav.after), before = edge(nav.before);
+  let rows: OrderRow[] = [];
+  if (before) {
+    rows = (db().prepare(`SELECT * FROM orders ${where} AND ${NEWER} ORDER BY created, id LIMIT ?3`).all(...before, limit) as OrderRow[]).reverse();
+    if (rows.length < limit) rows = []; // Near the top: show the first page instead of a short one.
+  } else if (after) {
+    rows = db().prepare(`SELECT * FROM orders ${where} AND ${OLDER} ORDER BY created DESC, id DESC LIMIT ?3`).all(...after, limit) as OrderRow[];
+  }
+  if (!rows.length) rows = db().prepare(`SELECT * FROM orders ${where} ORDER BY created DESC, id DESC LIMIT ?`).all(limit) as OrderRow[];
+  const exists = (side: string, row?: OrderRow) => !!row && !!db().prepare(`SELECT 1 FROM orders ${where} AND ${side} LIMIT 1`).get(row.created, row.id);
+  const first = rows[0], last = rows.at(-1);
+  return { view, orders: rows.map(readOrder), total, newer: exists(NEWER, first) ? cursorOf(first!) : null, older: exists(OLDER, last) ? cursorOf(last!) : null };
 }
 // node:sqlite rows have a null prototype; copy into a plain object so it can go to a Client Component.
 export function orderCounts() {

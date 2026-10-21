@@ -21,6 +21,7 @@ const from = ip => ({ headers: { 'x-forwarded-for': ip } });
 // Form tokens are single-use: every order gets its own, issued a few seconds ago.
 let tokenSeq = 0, spamId;
 const freshToken = () => issueFormToken(Date.now() - 5000 - tokenSeq++);
+const statusOf = id => db().prepare('SELECT status FROM orders WHERE id=?').get(id)?.status;
 async function request(path, method = 'GET', body, options = {}) {
   const headers = { ...(method !== 'GET' ? { origin: base, 'x-bota-request': '1', 'Content-Type': 'application/json' } : {}), ...(cookie ? { cookie } : {}), ...options.headers };
   return fetch(base + path, { method, headers, body: body === undefined ? undefined : options.raw ? body : JSON.stringify(body), redirect: 'manual' });
@@ -184,7 +185,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const quarantined = async (body, reason) => {
       const response = await request('/api/orders', 'POST', body, from('192.0.2.80'));
       assert.equal(response.status, 201, 'Looks like success to a bot');
-      const { id } = await response.json(); const saved = orderPage('spam', 1).orders.find(o => o.id === id);
+      const { id } = await response.json(); const saved = orderPage('spam').orders.find(o => o.id === id);
       assert.equal(saved?.spamReason, reason); assert.equal(saved.customer.name, payload.customer.name);
       return id;
     };
@@ -192,7 +193,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     await quarantined(order({ formToken: undefined }), 'invalid');
     const forged = freshToken(); await quarantined(order({ formToken: forged.slice(0, -1) + (forged.endsWith('0') ? '1' : '0') }), 'invalid');
     assert.deepEqual(orderCounts(), { ...before, spam: before.spam + 3 }, 'Spam stays out of all orders and unprocessed');
-    assert.ok(!orderPage('all', 1).orders.some(o => o.id === honeypot)); assert.ok(!orderPage('new', 1).orders.some(o => o.id === honeypot));
+    assert.equal(statusOf(honeypot), 'spam'); assert.ok(!orderPage('all').orders.some(o => o.id === honeypot));
     // A person who submits within 3 seconds sees a clear message and can retry the same order.
     const quick = order({ formToken: issueFormToken() });
     const fast = await request('/api/orders', 'POST', quick, from('192.0.2.81'));
@@ -200,7 +201,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal(orderCounts().spam, before.spam + 3, 'A fast click is not spam');
     const retry = await request('/api/orders', 'POST', { ...quick, formToken: issueFormToken(Date.now() - 3500) }, from('192.0.2.81'));
     assert.equal(retry.status, 201); const real = (await retry.json()).id;
-    assert.ok(orderPage('new', 1).orders.some(o => o.id === real));
+    assert.equal(statusOf(real), 'new');
     assert.equal((await request('/api/orders', 'POST', order({ formToken: issueFormToken(Date.now() - 25 * 60 * 60_000) }), from('192.0.2.81'))).status, 400, 'A day-old page asks to refresh');
     spamId = honeypot;
   });
@@ -250,27 +251,50 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok(spamTab.includes('Это настоящий заказ')); assert.ok(spamTab.includes('заполнено скрытое поле-ловушка'));
     assert.match(spamTab, /Спам \((?:<!-- -->)?\d+/);
     assert.equal((await request('/api/admin/orders/' + spamId, 'PATCH', { status: 'new' })).status, 200, '«Это настоящий заказ» releases it');
-    assert.ok(orderPage('new', 1).orders.some(o => o.id === spamId)); assert.ok(!orderPage('spam', 1).orders.some(o => o.id === spamId));
+    assert.equal(statusOf(spamId), 'new'); assert.ok(!orderPage('spam').orders.some(o => o.id === spamId));
     db().prepare('DELETE FROM orders').run();
     const insert = (created, status, name) => db().prepare('INSERT INTO orders VALUES (?,?,?,?,?,?)').run(randomUUID(), randomUUID(), 'test', created, status, encrypt({ customer: { name, phone: '+000', email: '', note: '' }, items: [], total: 100 }));
     insert('2020-01-01T00:00:00.000Z', 'new', 'Старый необработанный');
     for (let i = 0; i < 45; i++) insert(new Date(Date.UTC(2026, 0, 1, 0, i)).toISOString(), 'reviewed', `Обработанный ${i}`);
     insert('2026-02-01T00:00:00.000Z', 'new', 'Свежий необработанный');
-    const all = orderPage('all', 1);
-    assert.deepEqual([all.total, all.pages, all.orders.length, all.orders[0].customer.name], [47, 3, 20, 'Свежий необработанный']);
-    assert.equal(orderPage('all', 3).orders.length, 7); assert.equal(orderPage('all', 99).page, 3); assert.equal(orderPage('all', -1).page, 1);
-    assert.equal(orderPage('all', 3).orders.at(-1).customer.name, 'Старый необработанный');
-    assert.deepEqual(orderPage('new', 1).orders.map(o => o.customer.name), ['Свежий необработанный', 'Старый необработанный']);
+    const all = orderPage('all');
+    assert.deepEqual([all.total, all.orders.length, all.orders[0].customer.name, all.newer], [47, 20, 'Свежий необработанный', null]);
+    // Walk every page by cursor: each order exactly once, newest to oldest, ending with the oldest.
+    const walk = (view, between = () => {}) => {
+      const seen = []; let page = orderPage(view);
+      for (;;) { seen.push(...page.orders.map(o => o.id)); between(page); if (!page.older) return seen; page = orderPage(view, { after: page.older }); }
+    };
+    const ids = db().prepare("SELECT id FROM orders WHERE status!='spam' ORDER BY created DESC, id DESC").all().map(r => r.id);
+    assert.deepEqual(walk('all'), ids);
+    // A new order arriving between pages: no repeats, no gaps among the orders already listed.
+    let arrived = 0;
+    const withArrival = walk('all', () => { if (!arrived++) insert(new Date().toISOString(), 'new', 'Пришёл во время просмотра'); });
+    assert.deepEqual(withArrival, ids, 'Earlier pages stay put when a new order arrives');
+    db().prepare("DELETE FROM orders WHERE request_hash='test' AND status='new' AND created > '2026-06-01'").run();
+    // Processing orders on the page being viewed: the next unprocessed page continues without gaps.
+    for (let i = 0; i < 25; i++) insert(new Date(Date.UTC(2026, 2, 1, 0, i)).toISOString(), 'new', `Новый ${i}`);
+    const unprocessedIds = db().prepare("SELECT id FROM orders WHERE status='new' ORDER BY created DESC, id DESC").all().map(r => r.id);
+    assert.equal(unprocessedIds.length, 27);
+    const processedFirst = walk('new', page => { for (const o of page.orders.slice(0, 3)) db().prepare("UPDATE orders SET status='reviewed' WHERE id=?").run(o.id); });
+    assert.deepEqual(processedFirst, unprocessedIds, 'Every unprocessed order is seen once even while some are processed');
+    for (const id of unprocessedIds) db().prepare("UPDATE orders SET status='new' WHERE id=?").run(id);
+    // Going back with "Новее" returns the previous page.
+    const second = orderPage('all', { after: orderPage('all').older });
+    assert.deepEqual(orderPage('all', { before: second.newer }).orders.map(o => o.id), orderPage('all').orders.map(o => o.id));
+    assert.equal(orderPage('all', { after: 'garbage' }).orders[0].id, orderPage('all').orders[0].id, 'A broken cursor shows the first page');
     const page1 = await (await request('/admin?tab=orders')).text();
-    assert.ok(page1.includes('Страница 1 из 3')); assert.ok(!page1.includes('Старый необработанный'), 'Old order is not on the first page');
-    const page3 = await (await request('/admin?tab=orders&page=3')).text();
-    assert.ok(page3.includes('Страница 3 из 3')); assert.ok(page3.includes('Старый необработанный'));
+    assert.ok(page1.includes('Старее →')); assert.ok(!page1.includes('Старый необработанный'), 'Old order is not on the first page');
+    const lastCursor = (() => { let p = orderPage('all'); while (p.older) { const next = orderPage('all', { after: p.older }); if (!next.older) return p.older; p = next; } })();
+    const lastPage = await (await request('/admin?tab=orders&after=' + encodeURIComponent(lastCursor))).text();
+    assert.ok(lastPage.includes('Старый необработанный')); assert.ok(lastPage.includes('← Новее'));
     const unprocessed = await (await request('/admin?tab=unprocessed')).text();
-    assert.ok(unprocessed.includes('Старый необработанный'), 'Unprocessed tab shows old orders too'); assert.ok(unprocessed.includes('Свежий необработанный'));
-    assert.ok(!unprocessed.includes('Обработанный 0')); assert.match(unprocessed, /Необработанные \((?:<!-- -->)?2/); assert.match(unprocessed, /Все заказы \((?:<!-- -->)?47/);
-    const old = orderPage('new', 1).orders[1];
+    assert.ok(unprocessed.includes('Новый 24'), 'Newest unprocessed order is first');
+    assert.ok(!unprocessed.includes('Обработанный 0')); assert.match(unprocessed, /Необработанные \((?:<!-- -->)?\d+/); assert.match(unprocessed, /Все заказы \((?:<!-- -->)?\d+/);
+    const old = db().prepare("SELECT id FROM orders WHERE created='2020-01-01T00:00:00.000Z'").get();
+    assert.equal(statusOf(old.id), 'new', 'Old unprocessed order stays in the tab regardless of age');
+    const before = orderPage('new').total;
     assert.equal((await request('/api/admin/orders/' + old.id, 'PATCH', { status: 'reviewed' })).status, 200);
-    assert.equal(orderPage('new', 1).total, 1, 'Processed order leaves the tab');
+    assert.equal(orderPage('new').total, before - 1, 'Processed order leaves the tab');
     assert.ok(!(await (await fetch(base + '/admin?tab=unprocessed')).text()).includes('Свежий необработанный'), 'Anonymous visitors see no orders');
   });
   await t.test('prepared instructions and five originals retain their recorded checksums', async () => {
