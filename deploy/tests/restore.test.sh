@@ -95,4 +95,26 @@ reset; mkdir -p "$T/openlock"; chmod 777 "$T/openlock"
 out=$(BOTA_LOCK="$T/openlock/deploy.lock" bash "$SITE/deploy/restore.sh" "$T/good.age" "$T/key.txt" 2>&1); code=$?
 untouched "lock folder writable by others"; check_contains "open lock folder: message" "$out" "закрытой для записи"
 
+# A running backup blocks the switch; timers are stopped for the restore and started again afterwards.
+reset; stub systemctl <<'S'
+#!/usr/bin/env bash
+echo "$*" >> "$T/systemctl.log"
+case "$*" in
+  "show -p ActiveState --value bota-backup.service") [ -f "$T/backup-running" ] && echo activating || echo inactive;;
+  "show -p ActiveState --value "*) echo inactive;;
+esac
+exit 0
+S
+rm -f "$T/systemctl.log"; touch "$T/backup-running"
+out=$(BOTA_JOB_WAIT=2 bash "$SITE/deploy/restore.sh" "$T/good.age" "$T/key.txt" 2>&1); code=$?
+untouched "backup still running"; check_contains "backup running: message" "$out" "Не дождался окончания: bota-backup"
+check_contains "backup running: timer started again" "$(cat "$T/systemctl.log")" "start bota-backup.timer"
+rm -f "$T/backup-running" "$T/systemctl.log"; reset; run "$T/good.age" "$T/key.txt"
+check "jobs idle: restore works" "$code" 0; check "jobs idle: database from backup" "$(db)" DB-FROM-BACKUP
+log=$(cat "$T/systemctl.log")
+check_contains "jobs idle: backup timer paused" "$log" "stop bota-backup.timer"
+check_contains "jobs idle: spam timer paused" "$log" "stop bota-spam-purge.timer"
+check_contains "jobs idle: timers started again" "$log" "start bota-spam-purge.timer"
+printf '#!/bin/sh\nexit 0\n' | stub systemctl
+
 summary

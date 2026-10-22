@@ -129,7 +129,8 @@ export type OrderView = 'all' | 'new' | 'spam';
 // 'all' hides quarantined spam, 'new' lists every unprocessed order regardless of age, 'spam' is the quarantine.
 const VIEW_WHERE: Record<OrderView, string> = { all: "WHERE status!='spam'", new: "WHERE status='new'", spam: "WHERE status='spam'" };
 export const SPAM_KEEP_DAYS = 30;
-// Called by the admin page, the orders API and, independently of visitors, daily by bota-spam-purge.timer.
+// Called by the admin page and the orders API. On the server bota-spam-purge (deploy/spam-purge.sh) also deletes
+// old spam daily, independently of visitors; keep its BOTA_SPAM_KEEP_DAYS equal to SPAM_KEEP_DAYS.
 export function purgeOldSpam(): number {
   const result = db().prepare("DELETE FROM orders WHERE status='spam' AND created < ?").run(new Date(Date.now() - SPAM_KEEP_DAYS * 86_400_000).toISOString());
   return Number(result.changes);

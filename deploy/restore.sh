@@ -24,7 +24,7 @@ READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 
 LOCK=${BOTA_LOCK:-/run/bota-deploy/deploy.lock}
 
-staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
+staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0 paused_timers=""
 
 # Ссылку определяем через stat (не следует по ссылкам), так же как [ -L ].
 is_link() { [ "$(stat -c %F -- "$1" 2>/dev/null)" = "symbolic link" ]; }
@@ -50,6 +50,30 @@ take_lock() {
   fi
 }
 # Перемещение папки только туда, где ещё ничего нет (mv -T не вкладывает папку внутрь существующей).
+# Бэкап и очистка спама работают с теми же данными. На время замены данных их таймеры останавливаем
+# и ждём, пока уже запущенные задачи закончатся: иначе копия могла бы смешать старую базу с новыми фото.
+JOBS="bota-backup bota-spam-purge"
+job_running() { case "$(systemctl show -p ActiveState --value "$1.service" 2>/dev/null)" in activating|active|deactivating|reloading) return 0;; esac; return 1; }
+pause_jobs() {
+  local job
+  for job in $JOBS; do
+    if systemctl is-active --quiet "$job.timer" 2>/dev/null; then
+      systemctl stop "$job.timer" && paused_timers="$paused_timers $job.timer"
+    fi
+  done
+  for _ in $(seq 1 ${BOTA_JOB_WAIT:-300}); do
+    local busy=""
+    for job in $JOBS; do if job_running "$job"; then busy="$busy $job"; fi; done
+    [ -z "$busy" ] && return 0
+    sleep 2
+  done
+  refuse "Не дождался окончания:$busy. Повторите позже."
+}
+resume_jobs() {
+  local timer
+  for timer in $paused_timers; do systemctl start "$timer" || echo "!! Не удалось снова включить $timer: sudo systemctl start $timer"; done
+  paused_timers=""
+}
 move_dir() {
   if [ -e "$2" ] || is_link "$2"; then echo "!! $2 уже существует, перемещение отменено."; return 1; fi
   mv -T -- "$1" "$2"
@@ -120,6 +144,8 @@ main() {
     refuse "Заказы в копии не расшифровываются текущим order-key (ключ от другой установки?)."
   fi
 
+  echo "== Жду окончания бэкапа и очистки спама (если идут) и приостанавливаю их"
+  pause_jobs
   echo "== Останавливаю сайт и подменяю данные"
   aside="$WORK_ROOT/before-restore-$stamp"
   switching=1
@@ -160,6 +186,7 @@ finish() {
     code=1
   fi
   if [ -n "$staging" ]; then rm -rf "$staging"; fi
+  resume_jobs
   exit "$code"
 }
 trap finish EXIT

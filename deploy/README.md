@@ -517,7 +517,7 @@ sudo systemctl start bota-backup-prune.service          # проверить о�
 sudo journalctl -u bota-backup-prune -n 20 --no-pager   # "Очистка: удалено …, осталось копий: …"
 sudo systemctl enable --now bota-spam-purge.timer       # ежедневное удаление спам-заказов старше 30 дней
 sudo systemctl start bota-spam-purge.service            # проверить сейчас
-sudo journalctl -u bota-spam-purge -n 20 --no-pager     # "Spam cleanup: removed …"
+sudo journalctl -u bota-spam-purge -n 20 --no-pager     # "Очистка спама: удалено …"
 ```
 
 Если копия не сделалась, `systemctl status bota-backup` покажет `failed`, а журнал — причину.

@@ -176,19 +176,6 @@ test('server flows, persistence, validation and security boundaries', async t =>
     } finally { db().prepare("DELETE FROM orders WHERE id = 'old-damaged'").run(); }
     assert.equal(dbVerify().status, 0);
   });
-  await t.test('db:purge-spam removes old spam without visitors, keeps real and recent orders', async () => {
-    const insert = db().prepare('INSERT INTO orders (id, request_id, request_hash, created, status, payload) VALUES (?, ?, ?, ?, ?, ?)');
-    const raw = db().prepare('SELECT payload FROM orders LIMIT 1').get().payload;
-    insert.run('old-spam', 'old-spam', 'x', '2000-01-01T00:00:00.000Z', 'spam', raw);
-    insert.run('old-real', 'old-real', 'x', '2000-01-01T00:00:00.000Z', 'new', raw);
-    insert.run('fresh-spam', 'fresh-spam', 'x', new Date().toISOString(), 'spam', raw);
-    try {
-      const run = spawnSync(process.execPath, ['--conditions=react-server', 'scripts/purge-spam.mjs'], { env: process.env, encoding: 'utf8' });
-      assert.equal(run.status, 0, run.stderr); assert.match(run.stdout, /removed 1 spam orders/);
-      const left = db().prepare("SELECT id FROM orders WHERE id IN ('old-spam', 'old-real', 'fresh-spam') ORDER BY id").all().map((r) => r.id);
-      assert.deepEqual(left, ['fresh-spam', 'old-real']);
-    } finally { db().prepare("DELETE FROM orders WHERE id IN ('old-spam', 'old-real', 'fresh-spam')").run(); }
-  });
   await t.test('comments under each look: public post, validation, staff badge, moderation', async () => {
     const admin = cookie; cookie = '';
     const post = (id, body, options) => request(`/api/products/${id}/comments`, 'POST', body, options);

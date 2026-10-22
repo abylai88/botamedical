@@ -4,6 +4,7 @@
 #   deploy/backup.sh  → /usr/local/sbin/bota-backup
 #   deploy/restore.sh → /usr/local/sbin/bota-restore
 #   deploy/backup-prune.sh → /usr/local/sbin/bota-backup-prune
+#   deploy/spam-purge.sh   → /usr/local/sbin/bota-spam-purge
 #   bota.service, bota-backup.service/.timer, bota-backup-prune.service/.timer,
 #   bota-spam-purge.service/.timer → /etc/systemd/system/
 # Все файлы принадлежат root: пользователь сайта bota не может их изменить.
@@ -20,7 +21,7 @@ if [ -n "$bad" ]; then
   echo "Отказ: эти файлы не принадлежат root или доступны для записи другим:"; echo "$bad"; exit 1
 fi
 
-for name in update backup restore backup-prune; do
+for name in update backup restore backup-prune spam-purge; do
   install -o root -g root -m 0755 "$SRC/$name.sh" "/usr/local/sbin/bota-$name"
 done
 for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune.service bota-backup-prune.timer \
@@ -28,5 +29,5 @@ for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune
   install -o root -g root -m 0644 "$SRC/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
-echo "Установлено: bota-update, bota-backup, bota-backup-prune, bota-restore и службы systemd."
+echo "Установлено: bota-update, bota-backup, bota-backup-prune, bota-spam-purge, bota-restore и службы systemd."
 echo "Если сайт уже работает, примените новые настройки службы: sudo systemctl restart bota"

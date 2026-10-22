@@ -18,7 +18,7 @@ echo DB > "$T/data/bota.sqlite"; echo KEY > "$T/data/order-key"; echo img > "$T/
 
 out=$(bash "$SITE/deploy/backup.sh" 2>&1); check "backup: exit" "$?" 0
 archive=$(ls "$T"/backups/bota-*.tar.gz.age)
-contents=$(tar -tzf "$archive" | tr '\n' ' ')
+contents=$(tar -tzf "$archive" | LC_ALL=C sort | tr '\n' ' ')
 check "backup: database and photos inside" "$contents" "bota-backup/ bota-backup/bota.sqlite bota-backup/uploads/ bota-backup/uploads/a.webp "
 case "$contents" in *order-key*) check "backup: order-key is NOT inside" yes no;; *) check "backup: order-key is NOT inside" no no;; esac
 check "backup: no unfinished part left" "$(ls -A "$T/backups" | grep -c part)" 0

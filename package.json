@@ -14,7 +14,6 @@
     "admin:create": "node --conditions=react-server scripts/admin.mjs",
     "key:create": "node scripts/order-key.mjs",
     "db:verify": "node --conditions=react-server scripts/db-verify.mjs",
-    "db:purge-spam": "node --conditions=react-server scripts/purge-spam.mjs",
     "assets": "node scripts/assets.mjs",
     "test": "node --conditions=react-server --test tests/*.test.mjs",
     "test:deploy": "bash deploy/tests/run.sh"

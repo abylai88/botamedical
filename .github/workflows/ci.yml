@@ -36,6 +36,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - name: sqlite3 для тестов очистки спама
+        run: command -v sqlite3 || (sudo apt-get update -q && sudo apt-get install -y -q sqlite3)
       - name: ShellCheck
         run: shellcheck -S warning deploy/*.sh deploy/tests/*.sh
       - name: Тесты скриптов деплоя
