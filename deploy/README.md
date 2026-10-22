@@ -301,7 +301,7 @@ sudo -u bota -H bash -c 'cd /srv/bota/app && BOTA_DATA_DIR=/var/lib/bota npm run
 ```bash
 # Сервер
 sudo cp /srv/bota/app/deploy/Caddyfile /etc/caddy/Caddyfile
-sudo nano /etc/caddy/Caddyfile                 # замените example.kz на свой домен и впишите почту
+sudo nano /etc/caddy/Caddyfile                 # замените example.kz на свой домен (почта уже указана)
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy
 sudo journalctl -u caddy -n 30 --no-pager      # ищите "certificate obtained successfully"
