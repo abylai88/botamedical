@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { appOrigin, publicDemo } from './lib/deployment';
 export function proxy(request: NextRequest) {
-  // Provider probes can use an internal Host; this endpoint returns no application data.
-  if (request.nextUrl.pathname === '/healthz' && (request.method === 'GET' || request.method === 'HEAD')) return NextResponse.next();
+  // Provider and deploy-script probes can use an internal Host; these endpoints return no application data.
+  if ((request.nextUrl.pathname === '/healthz' || request.nextUrl.pathname === '/readyz') && (request.method === 'GET' || request.method === 'HEAD')) return NextResponse.next();
   const expected = new URL(appOrigin());
   if (request.headers.get('host') !== expected.host) return new NextResponse('Invalid host', { status: 403 });
   const pathname = request.nextUrl.pathname;

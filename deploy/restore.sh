@@ -18,7 +18,9 @@ DATA_DIR="$DATA_ROOT/data"
 WORK_ROOT=${BOTA_RESTORE_ROOT:-/var/lib/bota-restore}
 SITE_USER=${BOTA_SITE_USER:-bota}
 SERVICE=${BOTA_SERVICE:-bota}
-HEALTH_URL=${BOTA_HEALTH_URL:-http://127.0.0.1:3000/healthz}
+APP=${BOTA_APP:-/srv/bota/current}
+# /readyz отвечает 200, только если база открыта и order-key расшифровывает заказы.
+READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 
 staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
 
@@ -73,6 +75,11 @@ main() {
   if [ "$(stat -c %s "$new/order-key")" != 32 ]; then refuse "order-key на сервере повреждён (не 32 байта)."; fi
   chown -R --no-dereference "$SITE_USER:$SITE_USER" "$new"
   chmod -R u=rwX,go= "$new"
+  # Заказы из копии должны открываться текущим order-key: проверка от имени bota (только счётчики, без данных).
+  chmod 711 "$staging"
+  if ! (cd "$APP" && sudo -u "$SITE_USER" env BOTA_DATA_DIR="$new" node --conditions=react-server scripts/db-verify.mjs); then
+    refuse "Заказы в копии не расшифровываются текущим order-key (ключ от другой установки?)."
+  fi
 
   echo "== Останавливаю сайт и подменяю данные"
   aside="$WORK_ROOT/before-restore-$stamp"
@@ -82,19 +89,19 @@ main() {
   mv -T "$new" "$DATA_DIR"
   echo "== Запускаю сайт"
   systemctl start "$SERVICE"
-  healthy
+  is_ready
   switching=0
 
   echo "== Готово. Прежние данные отложены в $aside"
   echo "   Проверьте админку (товары, заказы, контакты в заказах). Если всё в порядке: sudo rm -rf $aside"
 }
 
-healthy() {
+is_ready() {
   for _ in $(seq 1 30); do
-    if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then return 0; fi
+    if curl -fsS --max-time 3 "$READY_URL" >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then return 0; fi
     sleep 2
   done
-  echo "!! Сайт не ответил на $HEALTH_URL"
+  echo "!! Сайт не готов: $READY_URL не ответил 200 (база или order-key)"
   return 1
 }
 
@@ -110,7 +117,7 @@ finish() {
       mv -T "$aside" "$DATA_DIR"
     fi
     systemctl start "$SERVICE" || true
-    if healthy; then echo "!! Сайт работает на прежних данных."; else echo "!! Сайт не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"; fi
+    if is_ready; then echo "!! Сайт работает на прежних данных."; else echo "!! Сайт не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"; fi
     code=1
   fi
   if [ -n "$staging" ]; then rm -rf "$staging"; fi

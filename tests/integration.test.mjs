@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rename } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,7 @@ import sharp from 'sharp';
 process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
 // Installation step: the order key is created by an explicit command; the site never makes one itself.
 const keyScript = () => spawnSync(process.execPath, ['scripts/order-key.mjs'], { env: process.env, encoding: 'utf8' });
+const dbVerify = () => spawnSync(process.execPath, ['--conditions=react-server', 'scripts/db-verify.mjs'], { env: process.env, encoding: 'utf8' });
 const keyCreated = keyScript(); assert.equal(keyCreated.status, 0, keyCreated.stderr); assert.match(keyCreated.stdout, /order-key created/);
 const { db, products, product, orders, orderPage, orderCounts, purgeOldSpam, encrypt, digest } = await import('../lib/db.ts');
 const { issueFormToken } = await import('../lib/form-token.ts');
@@ -143,6 +144,8 @@ test('server flows, persistence, validation and security boundaries', async t =>
       const response = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.150'));
       assert.equal(response.status, 503); assert.match((await response.json()).error, /Не удалось оформить заказ/);
       assert.equal(existsSync(keyFile), false, 'The site must not create a key by itself'); assert.equal(count(), saved);
+      assert.equal((await request('/readyz')).status, 503, 'Not ready without the order key'); assert.equal((await request('/healthz')).status, 200);
+      assert.equal(dbVerify().status, 1);
     } finally { await rename(keyFile + '.away', keyFile); }
   });
   await t.test('order persistence, authoritative totals, encryption and retry idempotency', async () => {
@@ -154,6 +157,18 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/orders', 'POST', { ...payload, customer: { ...payload.customer, name: 'Другой' } })).status, 409);
     assert.ok((await (await request('/admin')).text()).includes(payload.customer.name));
     const anonymous = await fetch(base + '/admin'); assert.ok(!(await anonymous.text()).includes(payload.customer.name));
+  });
+  await t.test('readyz and db:verify catch an order key that cannot open the saved orders', async () => {
+    assert.ok(orders().length > 0, 'Needs a saved order');
+    const ready = await request('/readyz'); assert.equal(ready.status, 200); assert.deepEqual(await ready.json(), { status: 'ready' });
+    const ok = dbVerify(); assert.equal(ok.status, 0, ok.stderr); assert.match(ok.stdout, /^OK: .* 1 newest orders decrypted/); assert.ok(!ok.stdout.includes(payload.customer.name));
+    const keyFile = join(process.env.BOTA_DATA_DIR, 'order-key'); const original = await readFile(keyFile);
+    await writeFile(keyFile, randomBytes(32));
+    try {
+      const wrong = await request('/readyz'); assert.equal(wrong.status, 503); assert.deepEqual(await wrong.json(), { status: 'not ready' });
+      const failed = dbVerify(); assert.equal(failed.status, 1); assert.match(failed.stderr, /1 of 1 newest orders cannot be decrypted/); assert.ok(!failed.stderr.includes(payload.customer.name));
+    } finally { await writeFile(keyFile, original); }
+    assert.equal((await request('/readyz')).status, 200);
   });
   await t.test('comments under each look: public post, validation, staff badge, moderation', async () => {
     const admin = cookie; cookie = '';

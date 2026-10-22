@@ -100,6 +100,22 @@ function decrypt(value: string) {
   decipher.setAuthTag(bytes.subarray(12, 28));
   return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8'));
 }
+// Decrypts the newest orders with the current order-key and reports only counts, never the contents.
+export function verifyOrders(limit = 20) {
+  const rows = db().prepare('SELECT payload FROM orders ORDER BY created DESC LIMIT ?').all(limit) as { payload: string }[];
+  let failed = 0;
+  for (const row of rows) { try { decrypt(row.payload); } catch { failed++; } }
+  return { checked: rows.length, failed };
+}
+// Readiness (/readyz, bota-update, bota-restore): the database answers, the order key is present, encrypts and
+// decrypts a test value, and opens the newest order. Nothing about the data leaves this function.
+export function ready() {
+  db().prepare('SELECT 1').get();
+  if (!hasOrderKey() || decrypt(encrypt({ check: 1 })).check !== 1) return false;
+  const newest = db().prepare('SELECT payload FROM orders ORDER BY created DESC LIMIT 1').get() as { payload: string } | undefined;
+  if (newest) decrypt(newest.payload);
+  return true;
+}
 type OrderRow = { id: string; created: string; status: Order['status']; payload: string };
 const readOrder = (row: OrderRow): Order => ({ ...decrypt(row.payload), id: row.id, createdAt: row.created, status: row.status });
 export function orders(): Order[] {

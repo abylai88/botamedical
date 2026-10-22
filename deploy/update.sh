@@ -4,8 +4,9 @@
 #
 # Каждая версия собирается в своей папке /srv/bota/releases/<дата-коммит>, сайт работает из
 # /srv/bota/current — это ссылка на рабочую версию. Пока новая версия собирается, текущая работает
-# и не трогается. Переключение: ссылка на новую → перезапуск → проверка /healthz. Если что-то не так,
-# ссылка возвращается на предыдущую готовую версию (без пересборки). Хранятся 3 последние версии.
+# и не трогается. Переключение: ссылка на новую → перезапуск → проверка /readyz. Если что-то не так,
+# ссылка возвращается на предыдущую готовую версию (без пересборки). Именно /readyz, а не /healthz:
+# сайт должен не просто запуститься, а открыть базу и расшифровать заказы. Хранятся 3 последние версии.
 #
 # Сборку делает пользователь bota-build, затем папка передаётся root: сайт (bota) может её только читать.
 # Скрипты из папок, куда может писать сайт или сборка, этот скрипт не запускает.
@@ -18,7 +19,8 @@ CACHE=${BOTA_CACHE:-/var/cache/bota}
 BUILD_USER=${BOTA_BUILD_USER:-bota-build}
 SITE_USER=${BOTA_SITE_USER:-bota}
 SERVICE=${BOTA_SERVICE:-bota}
-HEALTH_URL=${BOTA_HEALTH_URL:-http://127.0.0.1:3000/healthz}
+# /readyz отвечает 200, только если база открыта и order-key расшифровывает заказы.
+READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 KEEP=${BOTA_KEEP_RELEASES:-3}
 MIN_FREE_MB=${BOTA_MIN_FREE_MB:-1500}
 LOCK=${BOTA_LOCK:-/run/bota-update.lock}
@@ -109,18 +111,18 @@ switch_to() {
   local dir=$1
   ln -sfn "$dir" "$CURRENT.new" && mv -Tf "$CURRENT.new" "$CURRENT" || return 1
   systemctl restart "$SERVICE" || return 1
-  healthy
+  is_ready
 }
 
-# Ждём ответа /healthz: до 30 попыток, на каждую не больше 3 секунд.
-healthy() {
+# Ждём ответа 200 от /readyz: до 30 попыток, на каждую не больше 3 секунд.
+is_ready() {
   for _ in $(seq 1 30); do
-    if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then
-      echo "== Сайт отвечает"; return 0
+    if curl -fsS --max-time 3 "$READY_URL" >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then
+      echo "== Сайт готов: база и order-key в порядке"; return 0
     fi
     sleep 2
   done
-  echo "!! Сайт не ответил на $HEALTH_URL"
+  echo "!! Сайт не готов: $READY_URL не ответил 200 (база или order-key)"
   return 1
 }
 
