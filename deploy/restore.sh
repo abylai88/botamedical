@@ -24,7 +24,7 @@ READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 
 LOCK=${BOTA_LOCK:-/run/bota-deploy/deploy.lock}
 
-staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0 paused_timers=""
+staging="" aside="" stamp=${BOTA_RESTORE_STAMP:-$(date +%Y%m%d-%H%M%S)} switching=0 paused_timers="" aside_moved=0
 
 # Ссылку определяем через stat (не следует по ссылкам), так же как [ -L ].
 is_link() { [ "$(stat -c %F -- "$1" 2>/dev/null)" = "symbolic link" ]; }
@@ -81,6 +81,7 @@ move_dir() {
 
 main() {
   if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo"; exit 1; fi
+  if ! [[ "$stamp" =~ ^[0-9]{8}-[0-9]{6}$ ]]; then echo "Неверная метка времени: $stamp"; exit 1; fi
   take_lock
   if [ $# -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
     echo "Использование: sudo bota-restore ФАЙЛ_КОПИИ.tar.gz.age ФАЙЛ_СЕКРЕТНОГО_КЛЮЧА"; exit 1
@@ -136,11 +137,12 @@ main() {
   # shellcheck disable=SC2024 # так и задумано: читает bota, а записывает root в свою папку
   sudo -u "$SITE_USER" cat "$DATA_DIR/order-key" > "$new/order-key"
   if [ "$(stat -c %s "$new/order-key")" != 32 ]; then refuse "order-key на сервере повреждён (не 32 байта)."; fi
-  chown -R --no-dereference "$SITE_USER:$SITE_USER" "$new"
-  chmod -R u=rwX,go= "$new"
-  # Заказы из копии должны открываться текущим order-key: проверка от имени bota (только счётчики, без данных).
-  chmod 711 "$staging"
-  if ! (cd "$APP" && sudo -u "$SITE_USER" env BOTA_DATA_DIR="$new" node --conditions=react-server scripts/db-verify.mjs); then
+  # Пока сайт работает, подготовленные данные остаются только у root (папка 0700): работающий сайт
+  # (bota) не может изменить их между проверкой и переключением.
+  chmod 700 "$staging"
+  # Заказы из копии должны открываться текущим order-key. Проверяет root кодом рабочей версии
+  # (он принадлежит root) — только чтение, выводятся лишь счётчики, без данных заказов.
+  if ! (cd "$APP" && env BOTA_DATA_DIR="$new" node --conditions=react-server scripts/db-verify.mjs); then
     refuse "Заказы в копии не расшифровываются текущим order-key (ключ от другой установки?)."
   fi
 
@@ -148,9 +150,14 @@ main() {
   pause_jobs
   echo "== Останавливаю сайт и подменяю данные"
   aside="$WORK_ROOT/before-restore-$stamp"
+  if [ -e "$aside" ] || is_link "$aside"; then refuse "$aside уже существует. Повторите через минуту."; fi
   switching=1
   systemctl stop "$SERVICE"
+  # Данные передаются сайту только теперь, когда он остановлен.
+  chown -R --no-dereference "$SITE_USER:$SITE_USER" "$new"
+  chmod -R u=rwX,go= "$new"
   move_dir "$DATA_DIR" "$aside"
+  aside_moved=1
   move_dir "$new" "$DATA_DIR"
   echo "== Запускаю сайт"
   systemctl start "$SERVICE"
@@ -177,7 +184,8 @@ finish() {
   if [ "$switching" = 1 ]; then
     echo "!! Восстановление не удалось. Возвращаю прежние данные."
     systemctl stop "$SERVICE" || true
-    if [ -n "$aside" ] && [ -d "$aside" ]; then
+    # Возвращаем отложенные данные, только если их действительно переместил этот запуск.
+    if [ "$aside_moved" = 1 ] && [ -d "$aside" ]; then
       if [ -e "$DATA_DIR" ] || is_link "$DATA_DIR"; then move_dir "$DATA_DIR" "$WORK_ROOT/failed-restore-$stamp" || true; fi
       if ! move_dir "$aside" "$DATA_DIR"; then echo "!! Прежние данные остались в $aside — верните их вручную."; fi
     fi

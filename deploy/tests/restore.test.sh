@@ -117,4 +117,11 @@ check_contains "jobs idle: spam timer paused" "$log" "stop bota-spam-purge.timer
 check_contains "jobs idle: timers started again" "$log" "start bota-spam-purge.timer"
 printf '#!/bin/sh\nexit 0\n' | stub systemctl
 
+# An existing before-restore folder with the same name is refused before anything is stopped or moved.
+reset; mkdir -p "$T/restore-root/before-restore-20990101-000000"; echo STRANGER > "$T/restore-root/before-restore-20990101-000000/marker"
+out=$(BOTA_RESTORE_STAMP=20990101-000000 bash "$SITE/deploy/restore.sh" "$T/good.age" "$T/key.txt" 2>&1); code=$?
+check "aside exists: exit" "$code" 1; check "aside exists: live database untouched" "$(db)" DB-CURRENT
+check "aside exists: stranger folder untouched" "$(cat "$T/restore-root/before-restore-20990101-000000/marker")" STRANGER
+check_contains "aside exists: message" "$out" "уже существует"
+
 summary
