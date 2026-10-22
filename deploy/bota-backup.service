@@ -1,0 +1,20 @@
+# Одна зашифрованная резервная копия. Запускается таймером bota-backup.timer.
+# Копируется в /etc/systemd/system/ (см. deploy/README.md, раздел 8).
+[Unit]
+Description=BOTA: зашифрованная резервная копия базы и фото
+
+[Service]
+Type=oneshot
+User=bota
+Group=bota
+Environment=BOTA_DATA_DIR=/var/lib/bota
+Environment=BOTA_BACKUP_DIR=/var/backups/bota
+Environment=BOTA_BACKUP_RECIPIENT=/etc/bota/backup-recipient.txt
+Environment=BOTA_BACKUP_KEEP=14
+ExecStart=/bin/bash /srv/bota/app/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true

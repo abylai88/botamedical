@@ -328,6 +328,152 @@ sudo bash /srv/bota/app/deploy/update.sh
 
 ---
 
+## 8. Резервные копии: настройка (один раз)
+
+Каждую ночь около 03:30 скрипт `deploy/backup.sh` делает копию базы (через `sqlite3 .backup` — это
+правильная копия даже во время работы сайта) и папки `uploads`, шифрует её и кладёт в `/var/backups/bota`.
+Хранятся 14 последних копий, старые удаляются сами.
+
+**Три вещи, которые нужно хранить отдельно друг от друга:**
+
+| Что | Где лежит | Зачем |
+|---|---|---|
+| Копии `bota-ДАТА.tar.gz.age` | сервер + раз в неделю на компьютер | сами данные, зашифрованы |
+| Секретный ключ бэкапов `bota-backup-key.txt` | только у вас: флешка + менеджер паролей | без него копию не расшифровать |
+| `order-key` | на сервере в `/var/lib/bota` + у вас (флешка + менеджер паролей) | без него не прочитать контакты в заказах |
+
+`order-key` в копию специально не входит: тот, кто украдёт копию, не прочитает контакты покупателей.
+Ваш `order-key` — это файл `.local\order-key` на компьютере (после переноса на сервере тот же самый).
+Сделайте ему две копии: на флешку и вложением в менеджер паролей. Если потеряете и его, и сервер — заказы не прочитать никак.
+
+### 8.1. Папка для копий
+
+```bash
+# Сервер
+sudo groupadd --system botabackup
+sudo usermod -aG botabackup abylai           # чтобы вы могли скачивать копии без sudo
+sudo install -d -o bota -g botabackup -m 2750 /var/backups/bota
+```
+
+После этого **выйдите с сервера (`exit`) и зайдите снова** — иначе новая группа не применится.
+
+### 8.2. Ключ шифрования
+
+Ключ создаём на сервере, секретную часть забираем себе и удаляем с сервера. На сервере остаётся только
+открытая часть: ею можно зашифровать, но нельзя расшифровать.
+
+```bash
+# Сервер
+age-keygen -o ~/bota-backup-key.txt                            # покажет "Public key: age1…"
+age-keygen -y ~/bota-backup-key.txt | sudo tee /etc/bota/backup-recipient.txt
+```
+
+```powershell
+# PowerShell: забираем секретный ключ
+scp abylai@IP_СЕРВЕРА:bota-backup-key.txt "$env:USERPROFILE\Documents\bota-backup-key.txt"
+```
+
+Перенесите `bota-backup-key.txt` на флешку и в менеджер паролей, затем удалите его из «Документов».
+Убедитесь, что флешка открывается и файл на месте, и только потом удалите ключ с сервера:
+
+```bash
+# Сервер
+shred -u ~/bota-backup-key.txt
+```
+
+### 8.3. Включаем ежедневный запуск
+
+```bash
+# Сервер
+sudo cp /srv/bota/app/deploy/bota-backup.service /srv/bota/app/deploy/bota-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl start bota-backup.service                # первая копия прямо сейчас
+sudo journalctl -u bota-backup -n 20 --no-pager         # "Готово: /var/backups/bota/bota-…"
+ls -l /var/backups/bota
+sudo systemctl enable --now bota-backup.timer
+systemctl list-timers bota-backup.timer                 # когда следующий запуск
+```
+
+Если копия не сделалась, `systemctl status bota-backup` покажет `failed`, а журнал — причину.
+
+---
+
+## 9. Раз в неделю: скачать копию на компьютер
+
+Если сервер сломается или провайдер пропадёт, копии на самом сервере не помогут. Раз в неделю скачивайте
+свежую копию:
+
+```powershell
+# PowerShell
+$dest = "$env:USERPROFILE\Documents\BOTA-backups"
+New-Item -ItemType Directory -Force $dest | Out-Null
+$latest = ssh abylai@IP_СЕРВЕРА "ls -1t /var/backups/bota/bota-*.tar.gz.age | head -n 1"
+scp "abylai@IP_СЕРВЕРА:$latest" $dest
+Get-ChildItem $dest | Sort-Object LastWriteTime -Descending | Format-Table Name, Length, LastWriteTime
+```
+
+Проверьте, что дата в имени файла — вчерашняя или сегодняшняя. Если копия старая, значит ночные копии
+не делаются: смотрите раздел 8.3.
+
+Правила хранения на компьютере:
+
+- держите **4 последние** копии (месяц), более старые удаляйте — так обещано в политике конфиденциальности;
+- **не загружайте копии в Google Drive, iCloud, Dropbox и другие облака**: их серверы не в Казахстане.
+  Компьютер и флешка — можно;
+- не кладите `bota-backup-key.txt` и `order-key` в папку `BOTA-backups`.
+
+---
+
+## 10. Восстановление сайта из копии
+
+Скрипт `deploy/restore.sh` расшифровывает копию, проверяет базу, останавливает сайт, **откладывает**
+текущие данные в `/var/lib/bota/before-restore-ДАТА` (ничего не удаляет), кладёт данные из копии и запускает сайт.
+
+### Если сервер новый
+
+Сначала пройдите шаги 1–3 этой инструкции. Затем положите `order-key` и выполните шаг 5 (сборка и запуск):
+
+```powershell
+# PowerShell: путь к order-key — где вы его храните (флешка и т. п.)
+scp "E:\order-key" abylai@IP_СЕРВЕРА:order-key
+```
+
+```bash
+# Сервер
+sudo install -d -o bota -g bota -m 700 /var/lib/bota
+sudo install -o bota -g bota -m 600 ~/order-key /var/lib/bota/order-key
+shred -u ~/order-key
+```
+
+Потом шаг 5, шаг 8.1 и шаг 6 (HTTPS). Новый ключ из 8.2 не создавайте: открытый ключ получим из прежнего
+секретного во время восстановления (ниже), а потом включите копии по шагу 8.3.
+
+### Восстановление (новый или старый сервер)
+
+```powershell
+# PowerShell: копия и секретный ключ бэкапов на сервер
+scp "$env:USERPROFILE\Documents\BOTA-backups\bota-ДАТА.tar.gz.age" abylai@IP_СЕРВЕРА:
+scp "E:\bota-backup-key.txt" abylai@IP_СЕРВЕРА:
+```
+
+```bash
+# Сервер
+sudo bash /srv/bota/app/deploy/restore.sh ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
+# Только на новом сервере: открытый ключ для будущих копий
+age-keygen -y ~/bota-backup-key.txt | sudo tee /etc/bota/backup-recipient.txt
+shred -u ~/bota-backup-key.txt          # секретный ключ на сервере не оставляем
+rm ~/bota-ДАТА.tar.gz.age
+```
+
+Если сервер старый и нужная копия ещё лежит на нём, скачивать её не надо: укажите путь
+`/var/backups/bota/bota-ДАТА.tar.gz.age` (список: `ls -1t /var/backups/bota`).
+
+После восстановления откройте `/admin`: товары на месте, в заказах видны имена и телефоны. Если контакты
+в заказах не открываются — на сервере не тот `order-key`. Когда всё в порядке, удалите отложенные данные
+(команду покажет скрипт): `sudo rm -rf /var/lib/bota/before-restore-ДАТА`.
+
+---
+
 ## Если что-то не работает
 
 | Признак | Что проверить |
