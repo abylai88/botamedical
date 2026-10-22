@@ -12,7 +12,16 @@ old=$(date -u -d '40 days ago' +%Y-%m-%dT%H:%M:%S.000Z); fresh=$(date -u -d '10 
 sqlite3 "$db" "CREATE TABLE orders (id TEXT PRIMARY KEY, created TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL);
   INSERT INTO orders VALUES ('old-spam', '$old', 'spam', 'x'), ('old-real', '$old', 'new', 'x'), ('fresh-spam', '$fresh', 'spam', 'x');"
 
+past=$(( $(date +%s) * 1000 - 60000 )); future=$(( $(date +%s) * 1000 + 3600000 ))
+sqlite3 "$db" "CREATE TABLE rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
+  CREATE TABLE used_form_tokens (hash TEXT PRIMARY KEY, expires INTEGER NOT NULL);
+  INSERT INTO rate_limits VALUES ('ip-old', 1, $past), ('ip-live', 1, $future);
+  INSERT INTO used_form_tokens VALUES ('t-old', $past), ('t-live', $future);"
+
 out=$(bash "$SITE/deploy/spam-purge.sh" 2>&1); check "purge: exit" "$?" 0
+check_contains "purge: expired service rows reported" "$out" "истёкшим сроком: удалено 2"
+check "purge: expired IP hashes gone, live kept" "$(sqlite3 "$db" 'SELECT key FROM rate_limits')" ip-live
+check "purge: expired form tokens gone, live kept" "$(sqlite3 "$db" 'SELECT hash FROM used_form_tokens')" t-live
 check_contains "purge: reports count" "$out" "удалено 1"
 check "purge: old spam gone, the rest kept" "$(sqlite3 "$db" 'SELECT id FROM orders ORDER BY id' | tr '\n' ' ')" "fresh-spam old-real "
 out=$(bash "$SITE/deploy/spam-purge.sh" 2>&1); check_contains "purge again: nothing to remove" "$out" "удалено 0"
