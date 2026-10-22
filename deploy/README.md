@@ -8,7 +8,7 @@
 ```
 Посетитель ──HTTPS──▶ Caddy (порты 80/443, сертификат сам) ──▶ сайт BOTA (127.0.0.1:3000, служба systemd)
                                                                     │
-                                                    /var/lib/bota — база, order-key, фото
+                                                    /var/lib/bota/data — база, order-key, фото
 ```
 
 Обозначения в командах — замените на свои:
@@ -252,16 +252,16 @@ sudo nano /etc/bota/bota.env  # APP_ORIGIN=https://ваш-домен ; сохр�
 ```bash
 # Сервер
 sudo systemctl stop bota 2>/dev/null || true
-sudo install -d -o bota -g bota -m 700 /var/lib/bota
-sudo cp ~/bota-local/bota.sqlite* ~/bota-local/order-key /var/lib/bota/
-if [ -d ~/bota-local/uploads ]; then sudo cp -r ~/bota-local/uploads /var/lib/bota/; fi
+sudo install -d -o bota -g bota -m 700 /var/lib/bota /var/lib/bota/data
+sudo cp ~/bota-local/bota.sqlite* ~/bota-local/order-key /var/lib/bota/data/
+if [ -d ~/bota-local/uploads ]; then sudo cp -r ~/bota-local/uploads /var/lib/bota/data/; fi
 sudo chown -R bota:bota /var/lib/bota
 sudo chmod -R u=rwX,go= /var/lib/bota
 
 # Проверки
-sudo sha256sum /var/lib/bota/order-key                                   # совпадает с Get-FileHash (регистр букв не важен)
-sudo -u bota sqlite3 /var/lib/bota/bota.sqlite 'PRAGMA integrity_check;'  # должно быть: ok
-sudo ls -la /var/lib/bota                                                # владелец bota, права drwx------ / -rw-------
+sudo sha256sum /var/lib/bota/data/order-key                              # совпадает с Get-FileHash (регистр букв не важен)
+sudo -u bota sqlite3 /var/lib/bota/data/bota.sqlite 'PRAGMA integrity_check;'  # должно быть: ok
+sudo ls -la /var/lib/bota/data                                           # владелец bota, права drwx------ / -rw-------
 
 # models
 sudo mv ~/bota-models /srv/bota/models
@@ -294,7 +294,7 @@ curl http://127.0.0.1:3000/healthz             # {"status":"ok"}
 Если данные **не** переносились (новая пустая база), создайте администратора:
 
 ```bash
-cd /srv/bota/current && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota node --conditions=react-server scripts/admin.mjs
+cd /srv/bota/current && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota/data node --conditions=react-server scripts/admin.mjs
 ```
 
 ### Проверка изоляции (один раз после первого запуска)
@@ -408,7 +408,7 @@ sudo bash /srv/bota/repo/deploy/install.sh && sudo systemctl restart bota
 |---|---|---|
 | Копии `bota-ДАТА.tar.gz.age` | сервер + раз в неделю на компьютер | сами данные, зашифрованы |
 | Секретный ключ бэкапов `bota-backup-key.txt` | только у вас: флешка + менеджер паролей | без него копию не расшифровать |
-| `order-key` | на сервере в `/var/lib/bota` + у вас (флешка + менеджер паролей) | без него не прочитать контакты в заказах |
+| `order-key` | на сервере в `/var/lib/bota/data` + у вас (флешка + менеджер паролей) | без него не прочитать контакты в заказах |
 
 `order-key` в копию специально не входит: тот, кто украдёт копию, не прочитает контакты покупателей.
 Ваш `order-key` — это файл `.local\order-key` на компьютере (после переноса на сервере тот же самый).
@@ -494,8 +494,16 @@ Get-ChildItem $dest | Sort-Object LastWriteTime -Descending | Format-Table Name,
 
 ## 10. Восстановление сайта из копии
 
-Команда `bota-restore` (скрипт `deploy/restore.sh`) расшифровывает копию, проверяет базу, останавливает сайт, **откладывает**
-текущие данные в `/var/lib/bota/before-restore-ДАТА` (ничего не удаляет), кладёт данные из копии и запускает сайт.
+Команда `bota-restore` (скрипт `deploy/restore.sh`) работает так:
+
+1. Пока сайт работает: проверяет свободное место, расшифровывает копию во временную папку рядом с данными
+   (`/var/lib/bota/restore-…`, тот же диск), проверяет базу (`PRAGMA integrity_check`) и кладёт к ней
+   ваш текущий `order-key`. Если копия повреждена или ключ не тот — сайт не трогается вообще.
+2. Останавливает сайт, переименованием откладывает текущие данные в `/var/lib/bota/before-restore-ДАТА`
+   (ничего не удаляет) и ставит на их место подготовленную папку.
+3. Запускает сайт и ждёт ответа `/healthz`.
+4. Если на шаге 2 или 3 что-то не так (или вы нажали Ctrl+C) — возвращает прежние данные на место
+   и снова запускает сайт. Неудачная попытка остаётся в `/var/lib/bota/failed-restore-ДАТА` для разбора.
 
 ### Если сервер новый
 
@@ -508,8 +516,8 @@ scp "E:\order-key" abylai@IP_СЕРВЕРА:order-key
 
 ```bash
 # Сервер
-sudo install -d -o bota -g bota -m 700 /var/lib/bota
-sudo install -o bota -g bota -m 600 ~/order-key /var/lib/bota/order-key
+sudo install -d -o bota -g bota -m 700 /var/lib/bota /var/lib/bota/data
+sudo install -o bota -g bota -m 600 ~/order-key /var/lib/bota/data/order-key
 shred -u ~/order-key
 ```
 

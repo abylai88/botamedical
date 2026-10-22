@@ -17,7 +17,7 @@ Environment=PORT=3000
 Environment=BOTA_BIND_HOST=127.0.0.1
 Environment=NEXT_TELEMETRY_DISABLED=1
 # Данные сайта (то же, что .local на компьютере): база, order-key, загруженные фото.
-Environment=BOTA_DATA_DIR=/var/lib/bota
+Environment=BOTA_DATA_DIR=/var/lib/bota/data
 # Сайт стоит за одним доверенным прокси (Caddy), лимиты считаются по IP посетителя.
 Environment=TRUST_PROXY=1
 # Адрес сайта (APP_ORIGIN) — в этом файле, он у каждого сервера свой.

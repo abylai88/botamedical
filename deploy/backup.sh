@@ -5,7 +5,7 @@
 # можно лишь секретным ключом, который хранится у владельца (см. deploy/README.md, раздел 8).
 set -euo pipefail
 
-DATA_DIR=${BOTA_DATA_DIR:-/var/lib/bota}
+DATA_DIR=${BOTA_DATA_DIR:-/var/lib/bota/data}
 BACKUP_DIR=${BOTA_BACKUP_DIR:-/var/backups/bota}
 RECIPIENT=${BOTA_BACKUP_RECIPIENT:-/etc/bota/backup-recipient.txt}
 KEEP=${BOTA_BACKUP_KEEP:-14}
