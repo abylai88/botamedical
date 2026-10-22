@@ -4,9 +4,11 @@
 // exactly like an upload in the admin panel (rotate, fit 2000x2400, WebP). Products of the category in
 // "hideCategory" are hidden, not deleted. Without --apply nothing is written: it only checks and prints the plan.
 // Safe to run again: products that already exist are skipped. BOTA_DATA_DIR selects the data folder.
-// The dry run opens an existing database read-only and never creates or seeds one.
+// The dry run reads a temporary copy of the database (the data folder is not touched at all) and decodes every
+// new photo, so broken files show up before anything is written.
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
@@ -55,8 +57,15 @@ async function photo(file) {
 }
 
 const dbFile = join(dataDir, 'bota.sqlite');
-// Dry run: read-only, and without a database everything is simply planned as new.
-const database = apply ? db() : existsSync(dbFile) ? new DatabaseSync(dbFile, { readOnly: true }) : null;
+// Dry run: a copy of the database (with its -wal/-shm) in a temporary folder; without a database everything is new.
+let scratch;
+function readCopy() {
+  scratch = mkdtempSync(join(tmpdir(), 'bota-import-dry-'));
+  for (const suffix of ['', '-wal', '-shm']) if (existsSync(dbFile + suffix)) copyFileSync(dbFile + suffix, join(scratch, 'bota.sqlite' + suffix));
+  return new DatabaseSync(join(scratch, 'bota.sqlite'), { readOnly: true });
+}
+process.on('exit', () => { if (scratch) rmSync(scratch, { recursive: true, force: true }); });
+const database = apply ? db() : existsSync(dbFile) ? readCopy() : null;
 if (!database) console.log(`No database yet in ${dataDir}: it is created on --apply.`);
 const productRows = () => database ? database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data)) : [];
 const exists = id => Boolean(database?.prepare('SELECT 1 FROM products WHERE id=?').get(id));
@@ -76,7 +85,13 @@ for (const p of plan.filter(p => !p.skip)) {
 console.log(`Create: ${created.length}, already exist: ${plan.length - created.length}, hide "${manifest.hideCategory}": ${toHide.length}`);
 for (const c of created) console.log(`  + ${c.item.id}  ${c.product.name}`);
 for (const p of toHide) console.log(`  - hide ${p.id}  ${p.name}`);
-if (!apply) { console.log('Dry run: nothing written. Add --apply to import.'); process.exit(0); }
+if (!apply) {
+  // Decode every new photo now (nothing is saved), so a broken or unsupported file fails the check, not the import.
+  for (const c of created) {
+    try { await photo(c.file); } catch (error) { console.error(`Photo cannot be used: ${c.file}: ${error.message}`); process.exit(1); }
+  }
+  console.log(`Photos checked: ${created.length}. Dry run: nothing written. Add --apply to import.`); process.exit(0);
+}
 
 // Photos first (new files only), then one transaction for media rows and products; on failure the new files are removed.
 const uploads = join(dataDir, 'uploads'); mkdirSync(uploads, { recursive: true, mode: 0o700 });
@@ -96,7 +111,16 @@ try {
       database.prepare('INSERT INTO media VALUES (?,?)').run(c.media, now);
       database.prepare('INSERT INTO products(id,data) VALUES (?,?)').run(c.item.id, JSON.stringify({ id: c.item.id, ...c.product }));
     }
-    for (const p of toHide) database.prepare('UPDATE products SET data=? WHERE id=?').run(JSON.stringify({ ...p, active: false, revision: p.revision + 1 }), p.id);
+    // Hide using the current row inside the transaction: an admin edit saved meanwhile is kept, only active/revision change.
+    let hidden = 0;
+    for (const { id } of toHide) {
+      const row = database.prepare('SELECT data FROM products WHERE id=?').get(id);
+      const current = row && JSON.parse(row.data);
+      if (!current || current.category !== manifest.hideCategory || !current.active) continue;
+      database.prepare('UPDATE products SET data=? WHERE id=?').run(JSON.stringify({ ...current, active: false, revision: current.revision + 1 }), id);
+      hidden++;
+    }
+    toHide.length = hidden;
     database.exec('COMMIT');
   } catch (error) { database.exec('ROLLBACK'); throw error; }
 } catch (error) {

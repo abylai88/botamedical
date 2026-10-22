@@ -32,9 +32,10 @@ test('import:scrubs creates products from photos, hides the old category and is 
   // A seeded database, then a dry run must leave it byte-for-byte unchanged.
   const seed = spawnSync(process.execPath, ['--conditions=react-server', '-e', "import('./lib/db.ts').then(m => m.db())"], { env: { ...process.env, BOTA_DATA_DIR: data }, encoding: 'utf8' });
   assert.equal(seed.status, 0, seed.stderr);
-  const before = readFileSync(join(data, 'bota.sqlite'));
+  const before = readFileSync(join(data, 'bota.sqlite')); const filesBefore = readdirSync(data).sort();
   const dry = run(); assert.equal(dry.status, 0, dry.stderr); assert.match(dry.stdout, /Create: 2, already exist: 0, hide "Образы": 3/); assert.match(dry.stdout, /Dry run/);
-  assert.ok(readFileSync(join(data, 'bota.sqlite')).equals(before), 'Dry run writes nothing');
+  assert.ok(readFileSync(join(data, 'bota.sqlite')).equals(before), 'Dry run writes nothing'); assert.deepEqual(readdirSync(data).sort(), filesBefore, 'No new files (-wal/-shm) either');
+  assert.match(dry.stdout, /Photos checked: 2/);
   assert.ok(!rows().some(p => p.id.startsWith('scrubs-')));
 
   const applied = run('--apply'); assert.equal(applied.status, 0, applied.stderr); assert.match(applied.stdout, /Done: created 2, hidden 3/);
@@ -54,6 +55,11 @@ test('import:scrubs creates products from photos, hides the old category and is 
   assert.ok(all.filter(p => p.category === 'Образы').every(p => !p.active), 'Old looks are hidden, not deleted');
   assert.equal(all.filter(p => p.category === 'Образы').length, 3);
 
+  // A broken photo fails the dry run already.
+  writeFileSync(join(photos, 'a-short.png'), 'not an image'); const broken = run();
+  assert.equal(broken.status, 0, 'Existing products are skipped, so their photos are not read again');
+  const fresh2 = spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest], { env: { ...process.env, BOTA_DATA_DIR: join(root, 'empty') }, encoding: 'utf8' });
+  assert.equal(fresh2.status, 1); assert.match(fresh2.stderr, /Photo cannot be used: .*a-short\.png/);
   const again = run('--apply'); assert.equal(again.status, 0, again.stderr); assert.match(again.stdout, /Done: created 0, hidden 0/);
   assert.equal(rows().length, all.length); assert.equal(readdirSync(join(data, 'uploads')).length, 2);
 });
