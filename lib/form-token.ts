@@ -9,6 +9,8 @@ import { PRIVACY_VERSION } from './i18n.ts';
 export const MIN_FILL_MS = 3000;
 const MAX_AGE_MS = 24 * 60 * 60_000;
 const TOKEN = /^(\d{13})\.([a-f0-9]{32})\.(\d{8})\.([a-f0-9]{64})$/;
+// Pages rendered by the previous release carry "<ms>.<id>.<hmac>": a real customer, asked to reload, not spam.
+const LEGACY = /^\d{13}\.[a-f0-9]{32}\.[a-f0-9]{64}$/;
 // The policy edition the customer saw; an order is accepted only under the edition that is current.
 const policy = (version = PRIVACY_VERSION) => version.replaceAll('-', '');
 function secret() {
@@ -22,7 +24,7 @@ export function issueFormToken(now = Date.now(), edition = policy()) {
 }
 export function checkFormToken(token: string | undefined, now = Date.now()): 'ok' | 'invalid' | 'fast' | 'expired' {
   const match = TOKEN.exec(token || '');
-  if (!match) return 'invalid';
+  if (!match) return LEGACY.test(token || '') ? 'expired' : 'invalid';
   const issued = Number(match[1]), expected = Buffer.from(sign(issued, match[2], match[3]), 'hex');
   if (!timingSafeEqual(expected, Buffer.from(match[4], 'hex'))) return 'invalid';
   // The policy changed after the form was shown: the customer reloads and accepts the current edition.

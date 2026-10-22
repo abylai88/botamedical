@@ -263,6 +263,10 @@ test('server flows, persistence, validation and security boundaries', async t =>
     // A form shown under an older privacy policy edition is not accepted: the customer reloads and accepts the current one.
     const oldPolicy = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: issueFormToken(Date.now() - 5000, '20000101') }, from('192.0.2.87'));
     assert.equal(oldPolicy.status, 400, 'Form from an older policy edition must be reloaded'); assert.match((await oldPolicy.json()).error, /Обновите страницу/);
+    // A page rendered by the previous release (token without the policy edition) is asked to reload, not quarantined.
+    const [ms, id, , mac] = freshToken().split('.');
+    const legacy = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: `${ms}.${id}.${mac}` }, from('192.0.2.88'));
+    assert.equal(legacy.status, 400, 'Old-format token: reload, not a fake success'); assert.match((await legacy.json()).error, /Обновите страницу/);
     // Two customers whose forms rendered in the same millisecond both get through.
     const sameMoment = Date.now() - 5000, a = issueFormToken(sameMoment), b = issueFormToken(sameMoment);
     assert.notEqual(a, b); assert.equal(a.split('.')[0], b.split('.')[0]);
