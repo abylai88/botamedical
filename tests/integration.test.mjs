@@ -55,6 +55,9 @@ test('server flows, persistence, validation and security boundaries', async t =>
       assert.match(response.headers.get('content-security-policy'), /nonce-/);
       assert.ok(!response.headers.get('content-security-policy').includes('unsafe-eval'));
     }
+    const privacy = await (await request('/privacy')).text();
+    for (const part of ['Политика конфиденциальности', 'территории Республики Казахстан', 'WhatsApp', 'проверить у юриста']) assert.ok(privacy.includes(part), part);
+    assert.ok((await (await request('/')).text()).includes('href="/privacy"'), 'Footer links to the privacy policy');
     // Next.js keeps status 200 once a loading boundary has started streaming.
     const missing = await request('/catalog/missing');
     assert.ok([200, 404].includes(missing.status));
@@ -131,6 +134,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const response = await request('/api/orders', 'POST', payload); assert.equal(response.status, 201); savedId = (await response.json()).id;
     const repeat = await request('/api/orders', 'POST', payload); assert.equal(repeat.status, 200); assert.equal((await repeat.json()).id, savedId);
     assert.equal(orders().length, 1); assert.equal(orders()[0].total, 580000); assert.equal(orders()[0].customer.name, payload.customer.name);
+    assert.equal(orders()[0].consentAt, orders()[0].createdAt, 'Consent time is saved with the order'); assert.match(orders()[0].privacyVersion, /^\d{4}-\d{2}-\d{2}$/);
     const raw = db().prepare('SELECT payload FROM orders').get().payload; assert.ok(!raw.includes(payload.customer.name)); assert.ok(!raw.includes(payload.customer.email));
     assert.equal((await request('/api/orders', 'POST', { ...payload, customer: { ...payload.customer, name: 'Другой' } })).status, 409);
     assert.ok((await (await request('/admin')).text()).includes(payload.customer.name));

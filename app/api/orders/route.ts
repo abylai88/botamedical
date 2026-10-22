@@ -7,6 +7,7 @@ import { checkFormToken, formTokenUsed, markFormTokenUsed } from '@/lib/form-tok
 import { orderSchema } from '@/lib/validation';
 import { lineKey } from '@/lib/types';
 import { whatsappLink } from '@/lib/site';
+import { PRIVACY_VERSION } from '@/lib/i18n';
 const refresh = 'Страница оформления устарела. Обновите страницу и отправьте заказ ещё раз.';
 // Rule for this route: 201 with an id only after the order is written to the database.
 // When it cannot be stored, the customer gets an error and keeps the cart, plus the WhatsApp link.
@@ -37,13 +38,15 @@ export async function POST(request: NextRequest) {
     });
     const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const ip = clientIp(request.headers);
-    const id = randomUUID();
+    const id = randomUUID(), created = new Date().toISOString();
+    // Proof of consent: when it was given and which edition of the privacy policy the customer saw.
+    const consent = { consentAt: created, privacyVersion: PRIVACY_VERSION };
     if (spamReason) {
       // Stored for the owner to review; the bot sees the usual answer. A full quarantine is an error,
       // because a real customer could also land here and must not get a number for nothing.
       purgeOldSpam();
       if (!rateLimit(`spam-ip:${ip}`, 5, 60 * 60_000) || !rateLimit('spam-global', 500, 24 * 60 * 60_000)) return notAccepted();
-      db().prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, new Date().toISOString(), 'spam', encrypt({ customer: input.customer, items, total, spamReason }));
+      db().prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, created, 'spam', encrypt({ customer: input.customer, items, total, spamReason, ...consent }));
       console.warn('BOTA order quarantined as spam:', spamReason);
       return json({ id }, 201);
     }
@@ -56,7 +59,7 @@ export async function POST(request: NextRequest) {
     database.exec('BEGIN IMMEDIATE');
     try {
       markFormTokenUsed(formToken!);
-      database.prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, new Date().toISOString(), 'new', encrypt({ customer: input.customer, items, total }));
+      database.prepare('INSERT INTO orders(id,request_id,request_hash,created,status,payload) VALUES (?,?,?,?,?,?)').run(id, input.requestId, requestHash, created, 'new', encrypt({ customer: input.customer, items, total, ...consent }));
       database.exec('COMMIT');
     } catch (error) { database.exec('ROLLBACK'); throw error; }
     return json({ id }, 201);
