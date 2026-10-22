@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync, backup } from 'node:sqlite';
 import sharp from 'sharp';
 import { db, dataDir } from '../lib/db.ts';
 import { productSchema } from '../lib/validation.ts';
@@ -57,15 +57,22 @@ async function photo(file) {
 }
 
 const dbFile = join(dataDir, 'bota.sqlite');
-// Dry run: a copy of the database (with its -wal/-shm) in a temporary folder; without a database everything is new.
+// Dry run: a consistent snapshot of the database in a temporary folder; without a database everything is new.
+// While the site runs (its -wal/-shm exist) the snapshot is taken with SQLite's backup API from a read-only
+// connection, so a write or checkpoint during the copy cannot mix states. Without -wal no one has the database
+// open, and a plain copy of the single file is consistent and creates nothing in the data folder.
 let scratch;
-function readCopy() {
+async function readCopy() {
   scratch = mkdtempSync(join(tmpdir(), 'bota-import-dry-'));
-  for (const suffix of ['', '-wal', '-shm']) if (existsSync(dbFile + suffix)) copyFileSync(dbFile + suffix, join(scratch, 'bota.sqlite' + suffix));
-  return new DatabaseSync(join(scratch, 'bota.sqlite'), { readOnly: true });
+  const copy = join(scratch, 'bota.sqlite');
+  if (existsSync(dbFile + '-wal') && existsSync(dbFile + '-shm')) {
+    const source = new DatabaseSync(dbFile, { readOnly: true });
+    try { await backup(source, copy); } finally { source.close(); }
+  } else copyFileSync(dbFile, copy);
+  return new DatabaseSync(copy, { readOnly: true });
 }
 process.on('exit', () => { if (scratch) rmSync(scratch, { recursive: true, force: true }); });
-const database = apply ? db() : existsSync(dbFile) ? readCopy() : null;
+const database = apply ? db() : existsSync(dbFile) ? await readCopy() : null;
 if (!database) console.log(`No database yet in ${dataDir}: it is created on --apply.`);
 const productRows = () => database ? database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data)) : [];
 const exists = id => Boolean(database?.prepare('SELECT 1 FROM products WHERE id=?').get(id));
@@ -111,16 +118,12 @@ try {
       database.prepare('INSERT INTO media VALUES (?,?)').run(c.media, now);
       database.prepare('INSERT INTO products(id,data) VALUES (?,?)').run(c.item.id, JSON.stringify({ id: c.item.id, ...c.product }));
     }
-    // Hide using the current row inside the transaction: an admin edit saved meanwhile is kept, only active/revision change.
-    let hidden = 0;
-    for (const { id } of toHide) {
-      const row = database.prepare('SELECT data FROM products WHERE id=?').get(id);
-      const current = row && JSON.parse(row.data);
-      if (!current || current.category !== manifest.hideCategory || !current.active) continue;
-      database.prepare('UPDATE products SET data=? WHERE id=?').run(JSON.stringify({ ...current, active: false, revision: current.revision + 1 }), id);
-      hidden++;
-    }
-    toHide.length = hidden;
+    // Hide what is in the category right now (read inside the transaction): products an admin added or edited
+    // meanwhile are included and their edits kept — only active/revision change.
+    const current = database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data))
+      .filter(p => p.category === manifest.hideCategory && p.active);
+    for (const p of current) database.prepare('UPDATE products SET data=? WHERE id=?').run(JSON.stringify({ ...p, active: false, revision: p.revision + 1 }), p.id);
+    toHide.length = 0; toHide.push(...current);
     database.exec('COMMIT');
   } catch (error) { database.exec('ROLLBACK'); throw error; }
 } catch (error) {
