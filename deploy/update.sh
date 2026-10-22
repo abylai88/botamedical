@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Обновление сайта до последней версии из GitHub (ветка main).
-# Устанавливается deploy/install.sh в /usr/local/sbin/bota-update. Запуск: sudo bota-update [--force]
+# Устанавливается deploy/install.sh в /usr/local/sbin/bota-update.
+# Запуск: sudo bota-update [--force]          — обновить до последней версии
+#         sudo bota-update --rollback [ИМЯ]  — вернуться на предыдущую (или указанную) готовую версию
 #
 # Каждая версия собирается в своей папке /srv/bota/releases/<дата-коммит>, сайт работает из
 # /srv/bota/current — это ссылка на рабочую версию. Пока новая версия собирается, текущая работает
@@ -23,14 +25,14 @@ SERVICE=${BOTA_SERVICE:-bota}
 READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 KEEP=${BOTA_KEEP_RELEASES:-3}
 MIN_FREE_MB=${BOTA_MIN_FREE_MB:-1500}
-LOCK=${BOTA_LOCK:-/run/bota-update.lock}
+LOCK=${BOTA_LOCK:-/run/lock/bota-deploy.lock}
 # Метка готовой версии: появляется последним шагом сборки. Без неё папка не считается версией.
 READY=.release-ready
 
 main() {
   if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo: sudo bota-update"; exit 1; fi
-  exec 9>"$LOCK"
-  if ! flock -n 9; then echo "Обновление уже идёт в другом окне."; exit 1; fi
+  take_lock
+  if [ "${1:-}" = "--rollback" ]; then rollback_manual "${2:-}"; fi
 
   echo "== Скачиваю обновления из GitHub"
   git -C "$REPO" pull --ff-only --quiet
@@ -69,7 +71,8 @@ main() {
   local target
   target=$(rollback_target "$prev" "$dir")
   if [ -z "$target" ]; then
-    echo "!! Готовой предыдущей версии нет (это первая установка). Журнал: sudo journalctl -u $SERVICE -n 100"; exit 1
+    echo "!! Готовой предыдущей версии нет (это первая установка). Проверьте, что order-key на месте (README, 4.3),"
+    echo "   и пришлите журнал: sudo journalctl -u $SERVICE -n 100"; exit 1
   fi
   if switch_to "$target"; then
     discard "$dir"
@@ -109,7 +112,8 @@ build() {
 # Ссылка current → dir (заменяется одним переименованием), перезапуск, проверка.
 switch_to() {
   local dir=$1
-  ln -sfn "$dir" "$CURRENT.new" && mv -Tf "$CURRENT.new" "$CURRENT" || return 1
+  # Папки версий никуда не перемещаются: меняется только ссылка, одним переименованием (mv -T).
+  rm -f "$CURRENT.new" && ln -s "$dir" "$CURRENT.new" && mv -Tf "$CURRENT.new" "$CURRENT" || return 1
   systemctl restart "$SERVICE" || return 1
   is_ready
 }
@@ -127,6 +131,38 @@ is_ready() {
 }
 
 # Куда откатываться: версия, работавшая до обновления, а если её нет — самая свежая другая готовая.
+# Общая блокировка для bota-update, bota-update --rollback и bota-restore: одновременно идёт только одно.
+# /run/lock доступна на запись всем, поэтому ссылку вместо файла блокировки не принимаем и файл не обрезаем.
+take_lock() {
+  if [ "$(stat -c %F -- "$LOCK" 2>/dev/null)" = "symbolic link" ]; then echo "!! $LOCK — ссылка. Отказ."; exit 1; fi
+  exec 9>>"$LOCK"
+  if ! flock -n 9; then
+    echo "!! Уже идёт обновление, восстановление или откат сайта. Дождитесь окончания и повторите."; exit 1
+  fi
+}
+
+# Ручной откат: на указанную версию или на ближайшую готовую версию старше рабочей.
+rollback_manual() {
+  local current target="" candidate
+  current=$(readlink -f "$CURRENT")
+  if [ -n "$1" ]; then
+    target="$RELEASES/$1"
+    if [ ! -f "$target/$READY" ]; then echo "!! Нет готовой версии $1. Список: ls $RELEASES"; exit 1; fi
+  else
+    for candidate in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sort -r); do
+      candidate=${candidate%/}
+      if [[ "$(basename "$candidate")" < "$(basename "$current")" ]] && [ -f "$candidate/$READY" ]; then target=$candidate; break; fi
+    done
+    if [ -z "$target" ]; then echo "!! Нет готовой версии старше рабочей $(basename "$current")."; exit 1; fi
+  fi
+  if [ "$target" = "$current" ]; then echo "Версия $(basename "$target") и так рабочая."; exit 0; fi
+  echo "== Возвращаю версию $(basename "$target")"
+  if switch_to "$target"; then echo "== Готово: работает версия $(basename "$target")"; exit 0; fi
+  echo "!! Версия $(basename "$target") не заработала. Возвращаю $(basename "$current")"
+  switch_to "$current" || echo "!! Сайт не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"
+  exit 1
+}
+
 rollback_target() {
   local prev=$1 failed=$2 candidate
   if [ -n "$prev" ] && [ "$prev" != "$failed" ] && [ -f "$prev/$READY" ]; then echo "$prev"; return; fi

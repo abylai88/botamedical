@@ -427,10 +427,15 @@ sudo bota-update
 Вернуть предыдущую версию вручную (например, если ошибка заметна только в работе):
 
 ```bash
-# Сервер: имя папки — из списка выше
-sudo ln -sfn /srv/bota/releases/ИМЯ_ПАПКИ /srv/bota/current.new && sudo mv -Tf /srv/bota/current.new /srv/bota/current
-sudo systemctl restart bota && curl http://127.0.0.1:3000/readyz
+# Сервер
+sudo bota-update --rollback                    # на ближайшую готовую версию старше рабочей
+sudo bota-update --rollback ИМЯ_ПАПКИ          # или на конкретную (имя — из ls /srv/bota/releases)
 ```
+
+Откат тоже проверяет `/readyz` и, если выбранная версия не заработала, возвращает ту, что была.
+
+`bota-update`, `bota-update --rollback` и `bota-restore` не запускаются одновременно: если одна из команд уже
+идёт, вторая сразу завершится с сообщением «Уже идёт обновление, восстановление или откат сайта».
 
 Если в новой версии изменились служебные скрипты или службы, `bota-update` напишет об этом. Тогда выполните:
 

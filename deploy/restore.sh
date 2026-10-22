@@ -22,14 +22,31 @@ APP=${BOTA_APP:-/srv/bota/current}
 # /readyz отвечает 200, только если база открыта и order-key расшифровывает заказы.
 READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 
+LOCK=${BOTA_LOCK:-/run/lock/bota-deploy.lock}
+
 staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
 
 # Ссылку определяем через stat (не следует по ссылкам), так же как [ -L ].
 is_link() { [ "$(stat -c %F -- "$1" 2>/dev/null)" = "symbolic link" ]; }
 refuse() { echo "!! $1 Сайт не тронут."; exit 1; }
+# Общая блокировка для bota-update, bota-update --rollback и bota-restore: одновременно идёт только одно.
+# /run/lock доступна на запись всем, поэтому ссылку вместо файла блокировки не принимаем и файл не обрезаем.
+take_lock() {
+  if [ "$(stat -c %F -- "$LOCK" 2>/dev/null)" = "symbolic link" ]; then echo "!! $LOCK — ссылка. Отказ."; exit 1; fi
+  exec 9>>"$LOCK"
+  if ! flock -n 9; then
+    echo "!! Уже идёт обновление, восстановление или откат сайта. Дождитесь окончания и повторите."; exit 1
+  fi
+}
+# Перемещение папки только туда, где ещё ничего нет (mv -T не вкладывает папку внутрь существующей).
+move_dir() {
+  if [ -e "$2" ] || is_link "$2"; then echo "!! $2 уже существует, перемещение отменено."; return 1; fi
+  mv -T -- "$1" "$2"
+}
 
 main() {
   if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo"; exit 1; fi
+  take_lock
   if [ $# -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
     echo "Использование: sudo bota-restore ФАЙЛ_КОПИИ.tar.gz.age ФАЙЛ_СЕКРЕТНОГО_КЛЮЧА"; exit 1
   fi
@@ -85,8 +102,8 @@ main() {
   aside="$WORK_ROOT/before-restore-$stamp"
   switching=1
   systemctl stop "$SERVICE"
-  mv -T "$DATA_DIR" "$aside"
-  mv -T "$new" "$DATA_DIR"
+  move_dir "$DATA_DIR" "$aside"
+  move_dir "$new" "$DATA_DIR"
   echo "== Запускаю сайт"
   systemctl start "$SERVICE"
   is_ready
@@ -113,8 +130,8 @@ finish() {
     echo "!! Восстановление не удалось. Возвращаю прежние данные."
     systemctl stop "$SERVICE" || true
     if [ -n "$aside" ] && [ -d "$aside" ]; then
-      if [ -e "$DATA_DIR" ] || is_link "$DATA_DIR"; then mv -T "$DATA_DIR" "$WORK_ROOT/failed-restore-$stamp"; fi
-      mv -T "$aside" "$DATA_DIR"
+      if [ -e "$DATA_DIR" ] || is_link "$DATA_DIR"; then move_dir "$DATA_DIR" "$WORK_ROOT/failed-restore-$stamp" || true; fi
+      if ! move_dir "$aside" "$DATA_DIR"; then echo "!! Прежние данные остались в $aside — верните их вручную."; fi
     fi
     systemctl start "$SERVICE" || true
     if is_ready; then echo "!! Сайт работает на прежних данных."; else echo "!! Сайт не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"; fi
