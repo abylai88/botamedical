@@ -9,6 +9,7 @@ DATA_DIR=${BOTA_DATA_DIR:-/var/lib/bota/data}
 BACKUP_DIR=${BOTA_BACKUP_DIR:-/var/backups/bota}
 RECIPIENT=${BOTA_BACKUP_RECIPIENT:-/etc/bota/backup-recipient.txt}
 KEEP=${BOTA_BACKUP_KEEP:-14}
+MAX_AGE_DAYS=${BOTA_BACKUP_MAX_AGE_DAYS:-30}
 # Копии читает и группа botabackup (владелец сервера скачивает их на компьютер), остальные — нет.
 umask 027
 
@@ -31,6 +32,8 @@ if [ -d "$DATA_DIR/uploads" ]; then cp -a "$DATA_DIR/uploads" "$work/bota-backup
 tar -C "$work" -czf - bota-backup | age -R "$RECIPIENT" -o "$part"
 mv "$part" "$BACKUP_DIR/$name"
 
-# Оставляем только KEEP последних копий.
+# Оставляем только KEEP последних копий и удаляем всё старше MAX_AGE_DAYS дней (так обещано в политике
+# конфиденциальности), даже если копий меньше KEEP — например, после долгого перерыва.
 ls -1t "$BACKUP_DIR"/bota-*.tar.gz.age | tail -n +"$((KEEP + 1))" | xargs -r rm -f --
+find "$BACKUP_DIR" -maxdepth 1 -name 'bota-*.tar.gz.age' -mmin +"$((MAX_AGE_DAYS * 24 * 60))" -delete
 echo "Готово: $BACKUP_DIR/$name ($(du -h "$BACKUP_DIR/$name" | cut -f1)), копий: $(ls -1 "$BACKUP_DIR"/bota-*.tar.gz.age | wc -l)"
