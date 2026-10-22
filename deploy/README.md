@@ -451,7 +451,8 @@ sudo bash /srv/bota/repo/deploy/install.sh && sudo systemctl restart bota
 
 Каждую ночь около 03:30 команда `bota-backup` (скрипт `deploy/backup.sh`) делает копию базы (через `sqlite3 .backup` — это
 правильная копия даже во время работы сайта) и папки `uploads`, шифрует её и кладёт в `/var/backups/bota`.
-Хранятся 14 последних копий, но не старше 30 дней: остальные удаляются сами.
+Хранятся 14 последних копий, но не старше 30 дней. Лишние удаляет отдельная команда `bota-backup-prune` со своим
+таймером (около 05:00): она срабатывает каждый день, даже если ночной бэкап не удался.
 
 **Три вещи, которые нужно хранить отдельно друг от друга:**
 
@@ -502,7 +503,7 @@ shred -u ~/bota-backup-key.txt
 
 ### 8.3. Включаем ежедневный запуск
 
-Службу и таймер уже установил `install.sh` (шаг 3).
+Службы и таймеры бэкапа и очистки уже установил `install.sh` (шаг 3).
 
 ```bash
 # Сервер
@@ -510,7 +511,10 @@ sudo systemctl start bota-backup.service                # первая копи�
 sudo journalctl -u bota-backup -n 20 --no-pager         # "Готово: /var/backups/bota/bota-…"
 ls -l /var/backups/bota
 sudo systemctl enable --now bota-backup.timer
-systemctl list-timers bota-backup.timer                 # когда следующий запуск
+sudo systemctl enable --now bota-backup-prune.timer     # ежедневная очистка старых копий
+systemctl list-timers 'bota-backup*'                    # когда следующие запуски
+sudo systemctl start bota-backup-prune.service          # проверить очистку сейчас
+sudo journalctl -u bota-backup-prune -n 20 --no-pager   # "Очистка: удалено …, осталось копий: …"
 ```
 
 Если копия не сделалась, `systemctl status bota-backup` покажет `failed`, а журнал — причину.

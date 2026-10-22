@@ -3,13 +3,12 @@
 # от имени пользователя bota (устанавливается deploy/install.sh в /usr/local/sbin/bota-backup). Ключ order-key в копию НЕ входит: он хранится отдельно у владельца.
 # Шифрование — age открытым ключом: на сервере лежит только открытый ключ, расшифровать копию
 # можно лишь секретным ключом, который хранится у владельца (см. deploy/README.md, раздел 8).
+# Старые копии удаляет отдельный bota-backup-prune (свой таймер): очистка не зависит от успеха бэкапа.
 set -euo pipefail
 
 DATA_DIR=${BOTA_DATA_DIR:-/var/lib/bota/data}
 BACKUP_DIR=${BOTA_BACKUP_DIR:-/var/backups/bota}
 RECIPIENT=${BOTA_BACKUP_RECIPIENT:-/etc/bota/backup-recipient.txt}
-KEEP=${BOTA_BACKUP_KEEP:-14}
-MAX_AGE_DAYS=${BOTA_BACKUP_MAX_AGE_DAYS:-30}
 # Копии читает и группа botabackup (владелец сервера скачивает их на компьютер), остальные — нет.
 umask 027
 
@@ -36,8 +35,4 @@ fi
 tar -C "$work" -czf - bota-backup | age -R "$RECIPIENT" -o "$part"
 mv "$part" "$BACKUP_DIR/$name"
 
-# Оставляем только KEEP последних копий и удаляем всё старше MAX_AGE_DAYS дней (так обещано в политике
-# конфиденциальности), даже если копий меньше KEEP — например, после долгого перерыва.
-ls -1t "$BACKUP_DIR"/bota-*.tar.gz.age | tail -n +"$((KEEP + 1))" | xargs -r rm -f --
-find "$BACKUP_DIR" -maxdepth 1 -name 'bota-*.tar.gz.age' -mmin +"$((MAX_AGE_DAYS * 24 * 60))" -delete
 echo "Готово: $BACKUP_DIR/$name ($(du -h "$BACKUP_DIR/$name" | cut -f1)), копий: $(ls -1 "$BACKUP_DIR"/bota-*.tar.gz.age | wc -l)"

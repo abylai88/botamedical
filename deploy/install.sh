@@ -3,7 +3,8 @@
 #   deploy/update.sh  → /usr/local/sbin/bota-update
 #   deploy/backup.sh  → /usr/local/sbin/bota-backup
 #   deploy/restore.sh → /usr/local/sbin/bota-restore
-#   bota.service, bota-backup.service, bota-backup.timer → /etc/systemd/system/
+#   deploy/backup-prune.sh → /usr/local/sbin/bota-backup-prune
+#   bota.service, bota-backup.service/.timer, bota-backup-prune.service/.timer → /etc/systemd/system/
 # Все файлы принадлежат root: пользователь сайта bota не может их изменить.
 # Запуск: sudo bash /srv/bota/repo/deploy/install.sh
 set -euo pipefail
@@ -18,12 +19,12 @@ if [ -n "$bad" ]; then
   echo "Отказ: эти файлы не принадлежат root или доступны для записи другим:"; echo "$bad"; exit 1
 fi
 
-for name in update backup restore; do
+for name in update backup restore backup-prune; do
   install -o root -g root -m 0755 "$SRC/$name.sh" "/usr/local/sbin/bota-$name"
 done
-for unit in bota.service bota-backup.service bota-backup.timer; do
+for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune.service bota-backup-prune.timer; do
   install -o root -g root -m 0644 "$SRC/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
-echo "Установлено: bota-update, bota-backup, bota-restore и службы systemd."
+echo "Установлено: bota-update, bota-backup, bota-backup-prune, bota-restore и службы systemd."
 echo "Если сайт уже работает, примените новые настройки службы: sudo systemctl restart bota"

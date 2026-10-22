@@ -194,8 +194,8 @@ prune() {
 # Новые служебные скрипты и службы не ставятся сами: root решает это отдельной командой.
 notice_changes() {
   local changed=0 name unit
-  for name in update backup restore; do cmp -s "$REPO/deploy/$name.sh" "/usr/local/sbin/bota-$name" || changed=1; done
-  for unit in bota.service bota-backup.service bota-backup.timer; do cmp -s "$REPO/deploy/$unit" "/etc/systemd/system/$unit" || changed=1; done
+  for name in update backup restore backup-prune; do cmp -s "$REPO/deploy/$name.sh" "/usr/local/sbin/bota-$name" || changed=1; done
+  for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune.service bota-backup-prune.timer; do cmp -s "$REPO/deploy/$unit" "/etc/systemd/system/$unit" || changed=1; done
   if [ "$changed" = 1 ]; then
     echo "!! В новой версии изменились служебные скрипты или службы. Установите их:"
     echo "   sudo bash $REPO/deploy/install.sh && sudo systemctl restart $SERVICE"
