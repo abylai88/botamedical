@@ -43,8 +43,9 @@ export function siteTexts(locale: Locale, content = getSiteContent()) {
 
 // Without an uploaded override, home photos follow the main photo of the matching product.
 const fallbacks: Partial<Record<SiteImageKey, [string, string]>> = {
-  hero1: ['look-02', '/images/look-02.webp'], hero2: ['look-01', '/images/look-01.webp'], hero3: ['look-03', '/images/look-03.webp'],
-  tileCoats: ['bota-coat', '/images/coat.webp'], tileLooks: ['look-03', '/images/look-03.webp'], brand: ['look-01', '/images/look-01.webp'],
+  // Хирургические костюмы (scripts/import-scrubs.mjs); пока их нет — исходные фото из public/images.
+  hero1: ['scrubs-002-green-short', '/images/look-02.webp'], hero2: ['scrubs-008-navy-short', '/images/look-01.webp'], hero3: ['scrubs-004-pink-cyan-short', '/images/look-03.webp'],
+  tileCoats: ['bota-coat', '/images/coat.webp'], tileLooks: ['scrubs-006-peacock-short', '/images/look-03.webp'], brand: ['scrubs-002-navy-long', '/images/look-01.webp'],
 };
 // The hero background has no product fallback: without an upload it is the green logo backdrop.
 export function defaultSiteImage(key: SiteImageKey) {

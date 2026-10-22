@@ -39,7 +39,7 @@ export const SITE_IMAGE_FIELDS = [
   { key: 'hero2', label: 'Первый экран: центральное фото' },
   { key: 'hero3', label: 'Первый экран: правое фото' },
   { key: 'tileCoats', label: 'Плитка 1 (халаты)' },
-  { key: 'tileLooks', label: 'Плитка 2 (образы)' },
+  { key: 'tileLooks', label: 'Плитка 2 (хирургические костюмы)' },
   { key: 'brand', label: 'Блок «О бренде»' },
 ] as const;
 export type SiteImageKey = (typeof SITE_IMAGE_FIELDS)[number]['key'];
