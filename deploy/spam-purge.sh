@@ -11,7 +11,9 @@ DAYS=${BOTA_SPAM_KEEP_DAYS:-30}
 db="$DATA_DIR/bota.sqlite"
 
 if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then echo "BOTA_SPAM_KEEP_DAYS должно быть числом дней"; exit 1; fi
-if [ ! -f "$db" ]; then echo "Нет базы: $db"; exit 1; fi
+# До первого запуска сайта базы ещё нет — очищать нечего, это не ошибка.
+if [ ! -e "$db" ]; then echo "Базы ещё нет ($db) — очищать нечего"; exit 0; fi
+if [ ! -f "$db" ] || [ -L "$db" ]; then echo "$db — не обычный файл"; exit 1; fi
 
 # Даты заказов хранятся как 2026-10-22T12:34:56.789Z — сравнение строк совпадает с порядком времени.
 removed=$(sqlite3 -cmd '.timeout 10000' "$db" \

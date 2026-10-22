@@ -18,5 +18,6 @@ check "purge: old spam gone, the rest kept" "$(sqlite3 "$db" 'SELECT id FROM ord
 out=$(bash "$SITE/deploy/spam-purge.sh" 2>&1); check_contains "purge again: nothing to remove" "$out" "удалено 0"
 out=$(BOTA_SPAM_KEEP_DAYS="1; DROP TABLE orders" bash "$SITE/deploy/spam-purge.sh" 2>&1); check "bad days value: refused" "$?" 1
 check "bad days value: table intact" "$(sqlite3 "$db" 'SELECT count(*) FROM orders')" 2
-out=$(BOTA_DATA_DIR="$T/missing" bash "$SITE/deploy/spam-purge.sh" 2>&1); check "no database: exit" "$?" 1
+out=$(BOTA_DATA_DIR="$T/missing" bash "$SITE/deploy/spam-purge.sh" 2>&1); check "no database yet: not an error" "$?" 0
+check_contains "no database yet: message" "$out" "очищать нечего"
 summary

@@ -222,6 +222,7 @@ notice_changes() {
   if [ "$changed" = 1 ]; then
     echo "!! В новой версии изменились служебные скрипты или службы. Установите их:"
     echo "   sudo bash $REPO/deploy/install.sh && sudo systemctl restart $SERVICE"
+    echo "   (install.sh сам включит новые таймеры; проверить: systemctl list-timers 'bota-*')"
   fi
 }
 

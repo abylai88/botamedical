@@ -29,5 +29,13 @@ for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune
   install -o root -g root -m 0644 "$SRC/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
+
+# Таймеры включаются сразу, когда для них всё готово; иначе — подсказка, что сделать позже (README, раздел 8).
+# Повторный запуск install.sh (при обновлении) включает и новые таймеры, появившиеся в новой версии.
+systemctl enable --now bota-spam-purge.timer
+if [ -d /var/backups/bota ]; then systemctl enable --now bota-backup-prune.timer
+else echo "Позже, когда создадите /var/backups/bota: sudo systemctl enable --now bota-backup-prune.timer"; fi
+if [ -s /etc/bota/backup-recipient.txt ]; then systemctl enable --now bota-backup.timer
+else echo "Позже, когда положите ключ /etc/bota/backup-recipient.txt: sudo systemctl enable --now bota-backup.timer"; fi
 echo "Установлено: bota-update, bota-backup, bota-backup-prune, bota-spam-purge, bota-restore и службы systemd."
 echo "Если сайт уже работает, примените новые настройки службы: sudo systemctl restart bota"
