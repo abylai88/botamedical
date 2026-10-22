@@ -182,7 +182,7 @@ caddy version
 | Кто | Что может | Зачем |
 |---|---|---|
 | `root` (через `sudo`) | всё; владеет кодом сайта и служебными скриптами | обновление, бэкап-скрипты, восстановление |
-| `bota-build` | писать только в папку новой версии во время её сборки | `npm ci` и сборка сайта не работают от root |
+| `bota-build` | писать только в папку новой версии (`/srv/bota/releases/…`) во время её сборки | `npm ci` и сборка сайта не работают от root |
 | `bota` | **читать** код, писать только в `/var/lib/bota` (данные) и `/var/cache/bota` (кеш картинок) | от него работает сайт |
 
 Если сайт взломают, злоумышленник получит права `bota`: не сможет изменить ни код, ни скрипты, которые потом
@@ -294,7 +294,7 @@ curl http://127.0.0.1:3000/healthz             # {"status":"ok"}
 Если данные **не** переносились (новая пустая база), создайте администратора:
 
 ```bash
-cd /srv/bota/app && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota node --conditions=react-server scripts/admin.mjs
+cd /srv/bota/current && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota node --conditions=react-server scripts/admin.mjs
 ```
 
 ### Проверка изоляции (один раз после первого запуска)
@@ -306,7 +306,7 @@ cd /srv/bota/app && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota node --conditio
 ```bash
 # Сервер
 # 1. Сайт не может писать в свой код (ожидается: Permission denied)
-sudo -u bota touch /srv/bota/app/test
+sudo -u bota touch /srv/bota/current/test
 # 2. Оценка изоляции от systemd: внизу строка "Overall exposure level" — должно быть OK или MEDIUM, не UNSAFE
 systemd-analyze security bota --no-pager | tail -n 3
 ```
@@ -360,9 +360,31 @@ sudo journalctl -u caddy -n 30 --no-pager      # ищите "certificate obtaine
 sudo bota-update
 ```
 
-Скрипт скачивает изменения в `/srv/bota/repo`, собирает новую версию в отдельной папке (от имени `bota-build`,
-пока сайт работает на старой), передаёт её root и переключает сайт на неё. Если сборка не удалась, сайт
-остаётся на прежней версии.
+Как это устроено:
+
+```
+/srv/bota/releases/20261101-120000-a1b2c3d   ← версии сайта, каждая в своей папке (хранятся 3 последние)
+/srv/bota/releases/20261105-093000-e4f5a6b
+/srv/bota/current → releases/20261105-093000-e4f5a6b   ← ссылка на рабочую версию
+```
+
+1. Скрипт проверяет, что на диске есть хотя бы 1,5 ГБ, и собирает новую версию в новой папке
+   (от имени `bota-build`). Текущая версия всё это время работает и не трогается.
+2. Если сборка не удалась — новая папка удаляется, сайт остаётся как был.
+3. Ссылка `current` переключается на новую версию, сайт перезапускается, скрипт ждёт ответа `/healthz`
+   (до 30 попыток).
+4. Если новая версия не ответила — ссылка возвращается на прежнюю готовую версию **без пересборки**,
+   сайт перезапускается и снова проверяется. Сайт недоступен только на время перезапуска (секунды).
+
+Посмотреть версии: `ls -l /srv/bota/releases /srv/bota/current`.
+
+Вернуть предыдущую версию вручную (например, если ошибка заметна только в работе):
+
+```bash
+# Сервер: имя папки — из списка выше
+sudo ln -sfn /srv/bota/releases/ИМЯ_ПАПКИ /srv/bota/current.new && sudo mv -Tf /srv/bota/current.new /srv/bota/current
+sudo systemctl restart bota && curl http://127.0.0.1:3000/healthz
+```
 
 Если в новой версии изменились служебные скрипты или службы, `bota-update` напишет об этом. Тогда выполните:
 

@@ -8,8 +8,9 @@ Wants=network-online.target
 Type=simple
 User=bota
 Group=bota
+# Рабочая версия сайта: ссылка на папку в /srv/bota/releases (её переключает bota-update).
 # Код принадлежит root: пользователь bota может его только читать.
-WorkingDirectory=/srv/bota/app
+WorkingDirectory=/srv/bota/current
 # Сайт слушает только 127.0.0.1: снаружи к нему ходит лишь Caddy.
 Environment=NODE_ENV=production
 Environment=PORT=3000

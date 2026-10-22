@@ -1,52 +1,86 @@
 #!/usr/bin/env bash
 # Обновление сайта до последней версии из GitHub (ветка main).
-# Устанавливается deploy/install.sh в /usr/local/sbin/bota-update. Запуск: sudo bota-update
+# Устанавливается deploy/install.sh в /usr/local/sbin/bota-update. Запуск: sudo bota-update [--force]
 #
-# Код скачивается в /srv/bota/repo (принадлежит root), новая версия собирается в отдельной папке
-# пользователем bota-build, затем передаётся root и становится доступной сайту только для чтения.
+# Каждая версия собирается в своей папке /srv/bota/releases/<дата-коммит>, сайт работает из
+# /srv/bota/current — это ссылка на рабочую версию. Пока новая версия собирается, текущая работает
+# и не трогается. Переключение: ссылка на новую → перезапуск → проверка /healthz. Если что-то не так,
+# ссылка возвращается на предыдущую готовую версию (без пересборки). Хранятся 3 последние версии.
+#
+# Сборку делает пользователь bota-build, затем папка передаётся root: сайт (bota) может её только читать.
 # Скрипты из папок, куда может писать сайт или сборка, этот скрипт не запускает.
 set -euo pipefail
 
-REPO=/srv/bota/repo
-APP=/srv/bota/app
-BUILD_USER=bota-build
-CACHE=/var/cache/bota
-SERVICE=bota
+REPO=${BOTA_REPO:-/srv/bota/repo}
+RELEASES=${BOTA_RELEASES:-/srv/bota/releases}
+CURRENT=${BOTA_CURRENT:-/srv/bota/current}
+CACHE=${BOTA_CACHE:-/var/cache/bota}
+BUILD_USER=${BOTA_BUILD_USER:-bota-build}
+SITE_USER=${BOTA_SITE_USER:-bota}
+SERVICE=${BOTA_SERVICE:-bota}
+HEALTH_URL=${BOTA_HEALTH_URL:-http://127.0.0.1:3000/healthz}
+KEEP=${BOTA_KEEP_RELEASES:-3}
+MIN_FREE_MB=${BOTA_MIN_FREE_MB:-1500}
+LOCK=${BOTA_LOCK:-/run/bota-update.lock}
+# Метка готовой версии: появляется последним шагом сборки. Без неё папка не считается версией.
+READY=.release-ready
 
 main() {
   if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo: sudo bota-update"; exit 1; fi
+  exec 9>"$LOCK"
+  if ! flock -n 9; then echo "Обновление уже идёт в другом окне."; exit 1; fi
+
   echo "== Скачиваю обновления из GitHub"
   git -C "$REPO" pull --ff-only --quiet
-  local sha new
+  local sha prev name dir
   sha=$(git -C "$REPO" rev-parse HEAD)
-  if [ "$(cat "$APP/.release" 2>/dev/null)" = "$sha" ] && [ "${1:-}" != "--force" ]; then
+  prev=""
+  if [ -L "$CURRENT" ]; then prev=$(readlink -f "$CURRENT"); fi
+  if [ -n "$prev" ] && [ "$(cat "$prev/$READY" 2>/dev/null)" = "$sha" ] && [ "${1:-}" != "--force" ]; then
     echo "Обновлений нет (версия ${sha:0:7}). Пересобрать всё равно: sudo bota-update --force"; exit 0
   fi
 
-  new="$APP.new"
-  rm -rf "$new"
-  echo "== Собираю версию ${sha:0:7} (1–3 минуты, сайт пока работает)"
-  if ! build "$sha" "$new"; then
-    rm -rf "$new"
+  install -d -o root -g root -m 755 "$RELEASES"
+  local free
+  free=$(df -Pm "$RELEASES" | awk 'NR==2 {print $4}')
+  if [ "$free" -lt "$MIN_FREE_MB" ]; then
+    echo "!! Мало места на диске: свободно ${free} МБ, нужно хотя бы ${MIN_FREE_MB} МБ. Сайт не тронут."; exit 1
+  fi
+
+  name="$(date +%Y%m%d-%H%M%S)-${sha:0:7}"
+  dir="$RELEASES/$name"
+  echo "== Собираю версию ${sha:0:7} в $dir (1–3 минуты, сайт пока работает)"
+  if ! build "$sha" "$dir" "$name"; then
+    discard "$dir"
     echo "!! Сборка не удалась, сайт работает на прежней версии. Пришлите текст ошибки выше."; exit 1
   fi
 
   echo "== Переключаю сайт на новую версию"
-  systemctl stop "$SERVICE"
-  rm -rf "$APP.prev"
-  if [ -d "$APP" ]; then mv "$APP" "$APP.prev"; fi
-  mv "$new" "$APP"
-  rm -rf "${CACHE:?}/next"
-  install -d -o bota -g bota -m 700 "$CACHE/next"
-  systemctl start "$SERVICE"
-  check
-  notice_changes
-  echo "== Готово: версия ${sha:0:7}"
+  if switch_to "$dir"; then
+    prune
+    notice_changes
+    echo "== Готово: работает версия $name"
+    exit 0
+  fi
+
+  echo "!! Новая версия не заработала. Возвращаю предыдущую."
+  local target
+  target=$(rollback_target "$prev" "$dir")
+  if [ -z "$target" ]; then
+    echo "!! Готовой предыдущей версии нет (это первая установка). Журнал: sudo journalctl -u $SERVICE -n 100"; exit 1
+  fi
+  if switch_to "$target"; then
+    discard "$dir"
+    echo "!! Сайт работает на прежней версии $(basename "$target"). Пришлите вывод: sudo journalctl -u $SERVICE -n 100"
+  else
+    echo "!! Прежняя версия тоже не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"
+  fi
+  exit 1
 }
 
 # Сборка в папке dir. Каждый шаг проверяется явно: внутри `if !` bash не останавливается на ошибках сам.
 build() {
-  local sha=$1 dir=$2 tmp
+  local sha=$1 dir=$2 name=$3 tmp
   install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 755 "$dir" || return 1
   git -C "$REPO" archive "$sha" | sudo -u "$BUILD_USER" tar -x -C "$dir" || return 1
   # Сборка не видит настоящие данные: ей даётся пустая временная папка.
@@ -57,20 +91,59 @@ build() {
     rm -rf "$tmp"; return 1
   fi
   rm -rf "$tmp"
-  # Кеш картинок Next.js — в /var/cache/bota, единственном месте, куда сайту можно писать рядом с кодом.
-  rm -rf "$dir/.next/cache" && ln -s "$CACHE/next" "$dir/.next/cache" || return 1
-  echo "$sha" > "$dir/.release" || return 1
-  chown -R root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir"
+  # Кеш картинок Next.js у каждой версии свой, в /var/cache/bota — туда сайту можно писать.
+  install -d -o "$SITE_USER" -g "$SITE_USER" -m 700 "$CACHE" "$CACHE/$name" || return 1
+  rm -rf "$dir/.next/cache" && ln -s "$CACHE/$name" "$dir/.next/cache" || return 1
+  chown -R root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir" || return 1
+  echo "$sha" > "$dir/$READY"
 }
 
-# Ждём, пока сайт ответит на /healthz.
-check() {
+# Ссылка current → dir (заменяется одним переименованием), перезапуск, проверка.
+switch_to() {
+  local dir=$1
+  ln -sfn "$dir" "$CURRENT.new" && mv -Tf "$CURRENT.new" "$CURRENT" || return 1
+  systemctl restart "$SERVICE" || return 1
+  healthy
+}
+
+# Ждём ответа /healthz: до 30 попыток, на каждую не больше 3 секунд.
+healthy() {
   for _ in $(seq 1 30); do
-    if curl -fsS --max-time 3 http://127.0.0.1:3000/healthz >/dev/null 2>&1; then echo "== Сайт отвечает"; return 0; fi
-    sleep 1
+    if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE"; then
+      echo "== Сайт отвечает"; return 0
+    fi
+    sleep 2
   done
-  echo "!! Сайт не ответил за 30 секунд. Журнал: sudo journalctl -u $SERVICE -n 50"
+  echo "!! Сайт не ответил на $HEALTH_URL"
   return 1
+}
+
+# Куда откатываться: версия, работавшая до обновления, а если её нет — самая свежая другая готовая.
+rollback_target() {
+  local prev=$1 failed=$2 candidate
+  if [ -n "$prev" ] && [ "$prev" != "$failed" ] && [ -f "$prev/$READY" ]; then echo "$prev"; return; fi
+  for candidate in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sort -r); do
+    candidate=${candidate%/}
+    if [ "$candidate" != "$failed" ] && [ -f "$candidate/$READY" ]; then echo "$candidate"; return; fi
+  done
+}
+
+# Удаляет папку версии вместе с её кешем.
+discard() {
+  local dir=$1
+  rm -rf "$dir" "$CACHE/$(basename "$dir")"
+}
+
+# Оставляем KEEP последних готовых версий (рабочая не удаляется никогда) и убираем недособранные.
+prune() {
+  local current kept=0 dir
+  current=$(readlink -f "$CURRENT")
+  for dir in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sort -r); do
+    dir=${dir%/}
+    if [ "$dir" = "$current" ]; then kept=$((kept + 1)); continue; fi
+    if [ -f "$dir/$READY" ] && [ "$kept" -lt "$KEEP" ]; then kept=$((kept + 1)); continue; fi
+    discard "$dir"
+  done
 }
 
 # Новые служебные скрипты и службы не ставятся сами: root решает это отдельной командой.
