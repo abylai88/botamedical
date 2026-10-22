@@ -18,3 +18,8 @@ services:
         value: /tmp/bota-public-demo
       - key: BOTA_BIND_HOST
         value: 0.0.0.0
+      # Render's proxy appends the real visitor address to X-Forwarded-For. With this on,
+      # login/order/comment limits count per visitor instead of one shared limit for everyone.
+      # Enable only behind a trusted proxy like Render: without one the header can be faked.
+      - key: TRUST_PROXY
+        value: '1'

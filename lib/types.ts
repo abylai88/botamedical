@@ -11,7 +11,9 @@ export type ProductComment = {
 export type CartLine = { productId: string; size: string; color: string; quantity: number };
 export type OrderLine = CartLine & { name: string; price: number };
 export type Order = {
-  id: string; createdAt: string; status: 'new' | 'reviewed' | 'cancelled'; total: number;
+  id: string; createdAt: string; status: 'new' | 'reviewed' | 'cancelled' | 'spam'; total: number;
+  // Set only for orders quarantined as spam: why the server flagged it.
+  spamReason?: 'honeypot' | 'invalid';
   customer: { name: string; phone: string; email: string; note: string };
   items: OrderLine[];
 };

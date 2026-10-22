@@ -1,7 +1,12 @@
+// Error from an API route; `body` keeps extra fields such as the WhatsApp link.
+export class ApiError extends Error {
+  body: Record<string, unknown>;
+  constructor(message: string, body: Record<string, unknown>) { super(message); this.body = body; }
+}
 export async function api<T = { ok: boolean }>(url: string, method: string, data?: unknown): Promise<T> {
   const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'x-bota-request': '1' }, body: data === undefined ? undefined : JSON.stringify(data), cache: 'no-store' });
   const body = await response.json();
-  if (!response.ok) throw new Error(body.error || 'Запрос не выполнен. Попробуйте ещё раз.');
+  if (!response.ok) throw new ApiError(body.error || 'Запрос не выполнен. Попробуйте ещё раз.', body);
   return body;
 }
 // Uploads one image file through the admin media route and returns its /media URL.
