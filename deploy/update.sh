@@ -25,7 +25,7 @@ SERVICE=${BOTA_SERVICE:-bota}
 READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 KEEP=${BOTA_KEEP_RELEASES:-3}
 MIN_FREE_MB=${BOTA_MIN_FREE_MB:-1500}
-LOCK=${BOTA_LOCK:-/run/lock/bota-deploy.lock}
+LOCK=${BOTA_LOCK:-/run/bota-deploy/deploy.lock}
 # Метка готовой версии: появляется последним шагом сборки. Без неё папка не считается версией.
 READY=.release-ready
 
@@ -98,15 +98,23 @@ build() {
   rm -rf "$tmp"
   # Сборщик мог оставить запущенные процессы: завершаем их, прежде чем root возьмёт папку себе.
   pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
+  # Сначала папка сборки целиком переходит к root: после этого сборщик больше ничего в ней не подменит.
+  # --no-dereference: ссылки внутри сборки меняют владельца сами, а не то, на что указывают.
+  # chmod не трогает ссылки (-P по умолчанию для -R без -L), поэтому не меняет права их целей.
+  chown -R --no-dereference root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir" || return 1
+  # Дальше root пишет в сборку сам, поэтому пути проверяются: настоящие папки, не ссылки.
+  if [ "$(stat -c %F -- "$dir")" != directory ] || [ "$(stat -c %F -- "$dir/.next" 2>/dev/null)" != directory ]; then
+    echo "!! В сборке нет настоящей папки .next (возможно, ссылка). Отказ."; return 1
+  fi
   # Кеш картинок Next.js у каждой версии свой, в /var/cache/bota — туда пишет сайт. Внутри этой папки
   # всё делается от имени bota, чтобы root не следовал по подложенным туда ссылкам.
   if [ ! -e "$CACHE" ]; then install -d -o "$SITE_USER" -g "$SITE_USER" -m 700 "$CACHE" || return 1; fi
   if [ "$(stat -c %F -- "$CACHE")" != directory ]; then echo "!! $CACHE — не папка (возможно, ссылка)"; return 1; fi
   sudo -u "$SITE_USER" mkdir -m 700 "$CACHE/$name" || return 1
-  rm -rf "$dir/.next/cache" && ln -s "$CACHE/$name" "$dir/.next/cache" || return 1
-  # --no-dereference: ссылки внутри сборки меняют владельца сами, а не то, на что указывают.
-  chown -R --no-dereference root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir" || return 1
-  echo "$sha" > "$dir/$READY"
+  rm -rf -- "$dir/.next/cache" && ln -s "$CACHE/$name" "$dir/.next/cache" || return 1
+  # Маркер готовности: прежний путь (файл или ссылку, оставленные сборкой) удаляем, новый создаём
+  # с noclobber — запись не пойдёт по ссылке и не перезапишет существующий файл.
+  rm -f -- "$dir/$READY" && (set -C; echo "$sha" > "$dir/$READY") || return 1
 }
 
 # Ссылка current → dir (заменяется одним переименованием), перезапуск, проверка.
@@ -132,9 +140,20 @@ is_ready() {
 
 # Куда откатываться: версия, работавшая до обновления, а если её нет — самая свежая другая готовая.
 # Общая блокировка для bota-update, bota-update --rollback и bota-restore: одновременно идёт только одно.
-# /run/lock доступна на запись всем, поэтому ссылку вместо файла блокировки не принимаем и файл не обрезаем.
+# Файл блокировки лежит в папке, куда может писать только root (не в общей /run/lock): иначе другой
+# пользователь мог бы подменить файл и дать двум запускам взять «разные» блокировки.
 take_lock() {
+  local lock_dir
+  lock_dir=$(dirname -- "$LOCK")
+  if [ ! -e "$lock_dir" ]; then install -d -o root -g root -m 700 "$lock_dir" || exit 1; fi
+  if [ "$(stat -c %F -- "$lock_dir")" != directory ] || [ "$(stat -c %U -- "$lock_dir")" != root ] \
+    || [ -n "$(find "$lock_dir" -maxdepth 0 -perm /022 2>/dev/null)" ]; then
+    echo "!! $lock_dir должна быть папкой root, закрытой для записи другим. Отказ."; exit 1
+  fi
   if [ "$(stat -c %F -- "$LOCK" 2>/dev/null)" = "symbolic link" ]; then echo "!! $LOCK — ссылка. Отказ."; exit 1; fi
+  if [ -e "$LOCK" ] && { [ ! -f "$LOCK" ] || [ "$(stat -c %U -- "$LOCK")" != root ]; }; then
+    echo "!! $LOCK — не обычный файл root. Отказ."; exit 1
+  fi
   exec 9>>"$LOCK"
   if ! flock -n 9; then
     echo "!! Уже идёт обновление, восстановление или откат сайта. Дождитесь окончания и повторите."; exit 1

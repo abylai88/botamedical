@@ -81,4 +81,18 @@ echo "Filesystem 1M-blocks Used Available Use% Mounted"; echo "x 1 1 50 1% /"
 S
 run "$T/huge.age" "$T/key.txt"; untouched "low disk"; check_contains "low disk: message" "$out" "Мало места"; rm "$B/df"
 
+# A small archive that unpacks into much more (zeros compress ~1000x): the unpacked size decides, not the archive size.
+rm -rf "$T/pkg"; mkdir -p "$T/pkg/bota-backup/uploads"; head -c 30000000 /dev/zero > "$T/pkg/bota-backup/bota.sqlite"
+tar -czf "$T/bomb.age" -C "$T/pkg" bota-backup
+reset; stub df <<'S'
+#!/bin/sh
+echo "Filesystem 1M-blocks Used Available Use% Mounted"; echo "x 1 1 215 1% /"
+S
+run "$T/bomb.age" "$T/key.txt"; untouched "unpacks too big"; check_contains "unpacks too big: message" "$out" "Мало места для распаковки"; rm "$B/df"
+
+# The lock lives in a root-only folder: a folder others can write to is refused.
+reset; mkdir -p "$T/openlock"; chmod 777 "$T/openlock"
+out=$(BOTA_LOCK="$T/openlock/deploy.lock" bash "$SITE/deploy/restore.sh" "$T/good.age" "$T/key.txt" 2>&1); code=$?
+untouched "lock folder writable by others"; check_contains "open lock folder: message" "$out" "закрытой для записи"
+
 summary

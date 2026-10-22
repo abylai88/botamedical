@@ -22,7 +22,7 @@ APP=${BOTA_APP:-/srv/bota/current}
 # /readyz отвечает 200, только если база открыта и order-key расшифровывает заказы.
 READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 
-LOCK=${BOTA_LOCK:-/run/lock/bota-deploy.lock}
+LOCK=${BOTA_LOCK:-/run/bota-deploy/deploy.lock}
 
 staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
 
@@ -30,9 +30,20 @@ staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
 is_link() { [ "$(stat -c %F -- "$1" 2>/dev/null)" = "symbolic link" ]; }
 refuse() { echo "!! $1 Сайт не тронут."; exit 1; }
 # Общая блокировка для bota-update, bota-update --rollback и bota-restore: одновременно идёт только одно.
-# /run/lock доступна на запись всем, поэтому ссылку вместо файла блокировки не принимаем и файл не обрезаем.
+# Файл блокировки лежит в папке, куда может писать только root (не в общей /run/lock): иначе другой
+# пользователь мог бы подменить файл и дать двум запускам взять «разные» блокировки.
 take_lock() {
+  local lock_dir
+  lock_dir=$(dirname -- "$LOCK")
+  if [ ! -e "$lock_dir" ]; then install -d -o root -g root -m 700 "$lock_dir" || exit 1; fi
+  if [ "$(stat -c %F -- "$lock_dir")" != directory ] || [ "$(stat -c %U -- "$lock_dir")" != root ] \
+    || [ -n "$(find "$lock_dir" -maxdepth 0 -perm /022 2>/dev/null)" ]; then
+    echo "!! $lock_dir должна быть папкой root, закрытой для записи другим. Отказ."; exit 1
+  fi
   if [ "$(stat -c %F -- "$LOCK" 2>/dev/null)" = "symbolic link" ]; then echo "!! $LOCK — ссылка. Отказ."; exit 1; fi
+  if [ -e "$LOCK" ] && { [ ! -f "$LOCK" ] || [ "$(stat -c %U -- "$LOCK")" != root ]; }; then
+    echo "!! $LOCK — не обычный файл root. Отказ."; exit 1
+  fi
   exec 9>>"$LOCK"
   if ! flock -n 9; then
     echo "!! Уже идёт обновление, восстановление или откат сайта. Дождитесь окончания и повторите."; exit 1
@@ -66,9 +77,10 @@ main() {
     refuse "$WORK_ROOT и $DATA_ROOT на разных разделах диска."
   fi
 
-  # Место: распакованная копия занимает в несколько раз больше сжатой; старые данные не удаляются.
+  # Место для расшифровки: расшифрованный архив по размеру почти равен зашифрованному. Запас 200 МБ
+  # оставляем работающему сайту. Место под распаковку считаем ниже — по настоящим размерам файлов в архиве.
   local need free
-  need=$(( $(stat -c %s "$backup") * 6 / 1048576 + 100 ))
+  need=$(( $(stat -c %s "$backup") / 1048576 + 200 ))
   free=$(df -Pm "$WORK_ROOT" | awk 'NR==2 {print $4}')
   if [ "$free" -lt "$need" ]; then refuse "Мало места: свободно ${free} МБ, нужно около ${need} МБ."; fi
 
@@ -79,6 +91,15 @@ main() {
   local types
   types=$(tar -tvzf "$staging/backup.tar.gz" | cut -c1 | sort -u | tr -d '\n')
   if [ -n "$(printf '%s' "$types" | tr -d -- '-d')" ]; then refuse "В копии есть ссылки или особые файлы ($types)."; fi
+  # Место под распаковку — по сумме размеров файлов, указанных в архиве (а не по размеру сжатой копии).
+  # Прежние данные не удаляются, а переименовываются на том же разделе, поэтому места не требуют.
+  local unpacked
+  unpacked=$(tar -tvzf "$staging/backup.tar.gz" | awk '{s += $3} END {printf "%d", s / 1048576 + 1}')
+  need=$(( unpacked + 200 ))
+  free=$(df -Pm "$WORK_ROOT" | awk 'NR==2 {print $4}')
+  if [ "$free" -lt "$need" ]; then
+    refuse "Мало места для распаковки: свободно ${free} МБ, нужно около ${need} МБ (данные ${unpacked} МБ + запас)."
+  fi
   tar -xzf "$staging/backup.tar.gz" -C "$staging" --no-same-owner --no-same-permissions
   rm -f "$staging/backup.tar.gz"
   local new="$staging/bota-backup"

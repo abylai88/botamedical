@@ -101,11 +101,14 @@ function decrypt(value: string) {
   return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8'));
 }
 // Decrypts the newest orders with the current order-key and reports only counts, never the contents.
-export function verifyOrders(limit = 20) {
-  const rows = db().prepare('SELECT payload FROM orders ORDER BY created DESC LIMIT ?').all(limit) as { payload: string }[];
-  let failed = 0;
-  for (const row of rows) { try { decrypt(row.payload); } catch { failed++; } }
-  return { checked: rows.length, failed };
+// Checks every order (including quarantined spam) one row at a time, so a large database is not loaded at once.
+export function verifyOrders() {
+  let checked = 0, failed = 0;
+  for (const row of db().prepare('SELECT payload FROM orders').iterate() as unknown as Iterable<{ payload: string }>) {
+    checked++;
+    try { decrypt(row.payload); } catch { failed++; }
+  }
+  return { checked, failed };
 }
 // Readiness (/readyz, bota-update, bota-restore): the database answers, the order key is present, encrypts and
 // decrypts a test value, and opens the newest order. Nothing about the data leaves this function.

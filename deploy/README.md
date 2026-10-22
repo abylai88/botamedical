@@ -329,7 +329,7 @@ sudo systemctl status bota --no-pager          # Active: active (running)
 curl http://127.0.0.1:3000/healthz             # {"status":"ok"} — процесс сайта работает
 curl http://127.0.0.1:3000/readyz              # {"status":"ready"} — база открыта, order-key работает
 cd /srv/bota/current && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota/data node --conditions=react-server scripts/db-verify.mjs
-# "OK: … newest orders decrypted" — последние заказы открываются ключом (содержимое не выводится)
+# "OK: … orders decrypted" — все заказы открываются ключом (содержимое не выводится)
 ```
 
 `/readyz` отвечает 200, только если сайт действительно может принимать и читать заказы. Если там

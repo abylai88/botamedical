@@ -25,6 +25,10 @@ stub npm <<'S'
 if [ "$1" = ci ]; then mkdir -p node_modules; exit 0; fi
 [ -f "$T/buildfail" ] && { echo "build error"; exit 1; }
 mkdir -p .next/cache; echo built > .next/BUILD_ID
+# A compromised build may plant links where root later writes.
+[ -f "$T/evilmarker" ] && ln -s "$T/victim" .release-ready
+[ -f "$T/evilnext" ] && { rm -rf .next; mkdir -p "$T/elsewhere"; ln -s "$T/elsewhere" .next; }
+exit 0
 S
 # /readyz fails while "current" points at a release whose commit is listed in $T/badsha.
 stub curl <<'S'
@@ -70,6 +74,16 @@ run --rollback; check "manual rollback, nothing older: exit" "$code" 1; check "n
 run --rollback "$(ls "$T/srv/releases" | grep ddddddd)"; check "rollback to named version" "$(current)" ddddddd
 echo ccccccc3 > "$T/badsha"; run --rollback "$(ls "$T/srv/releases" | grep ccccccc)"; rm "$T/badsha"
 check "rollback target not ready: exit" "$code" 1; check "rollback target not ready: back to previous" "$(current)" ddddddd
+
+echo ORIGINAL > "$T/victim"; touch "$T/evilmarker"; release jjjjjjj1; run; rm "$T/evilmarker"
+check "planted marker link: update works" "$code" 0; check "planted marker link: target untouched" "$(cat "$T/victim")" ORIGINAL
+check "planted marker link: marker is a plain file" "$(stat -c %F "$T/srv/releases/"*-jjjjjjj/.release-ready)" "regular file"
+touch "$T/evilnext"; release kkkkkkk2; run; rm "$T/evilnext"
+check ".next is a link: refused" "$code" 1; check ".next is a link: current unchanged" "$(current)" jjjjjjj
+check ".next is a link: nothing written outside" "$(ls -A "$T/elsewhere" | tr '\n' ' ')" ""
+mkdir -p "$T/openlock"; chmod 777 "$T/openlock"; release lllllll3
+out=$(BOTA_LOCK="$T/openlock/deploy.lock" bash "$T/update.sh" 2>&1); code=$?
+check "open lock folder: refused" "$code" 1; check_contains "open lock folder: message" "$out" "закрытой для записи"
 
 rm -rf "$T/srv" "$T/cache"; mkdir -p "$T/srv" "$T/cache"; release iiiiiii9; echo iiiiiii9 > "$T/badsha"; run; rm "$T/badsha"
 check "first install not ready: exit" "$code" 1; check_contains "first install not ready: message" "$out" "order-key на месте"
