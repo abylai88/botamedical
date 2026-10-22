@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2010 # имена файлов в тестах задаём сами, ls | grep здесь безопасен
 # Tests for deploy/update.sh (bota-update) with stub tools. Run: bash deploy/tests/update.test.sh
 # Git Bash on Windows cannot create symlinks, so a copy of the script is used in which the "current" link
 # is a file holding the target path. Everything else is the unchanged script.

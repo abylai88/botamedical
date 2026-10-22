@@ -88,6 +88,7 @@ main() {
   check=$(sqlite3 "$new/bota.sqlite" 'PRAGMA integrity_check;')
   if [ "$check" != ok ]; then refuse "База в копии повреждена: $check."; fi
   # order-key читает bota (с правами сайта), записывает root — в свою папку.
+  # shellcheck disable=SC2024 # так и задумано: читает bota, а записывает root в свою папку
   sudo -u "$SITE_USER" cat "$DATA_DIR/order-key" > "$new/order-key"
   if [ "$(stat -c %s "$new/order-key")" != 32 ]; then refuse "order-key на сервере повреждён (не 32 байта)."; fi
   chown -R --no-dereference "$SITE_USER:$SITE_USER" "$new"

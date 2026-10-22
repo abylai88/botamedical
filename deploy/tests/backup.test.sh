@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2010 # имена файлов в тестах задаём сами, ls | grep здесь безопасен
 # Tests for deploy/backup.sh (bota-backup) and deploy/backup-prune.sh (bota-backup-prune) with stub tools.
 # Run: bash deploy/tests/backup.test.sh
 source "$(dirname "$0")/helpers.sh"

@@ -1,3 +1,5 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2034 # SITE и счётчики используются в тестах, которые подключают этот файл
 # Shared helpers for the deploy script tests. The tests replace system tools (systemctl, curl, age, sqlite3,
 # sudo, flock, …) with stubs, so they run without root, on Linux or in Git Bash on Windows.
 # Git Bash cannot create symlinks or apply POSIX modes, therefore:
