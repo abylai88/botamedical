@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
-import { db, product, encrypt, digest, rateLimit, purgeOldSpam } from '@/lib/db';
+import { db, product, encrypt, digest, rateLimit, purgeOldSpam, hasOrderKey } from '@/lib/db';
 import { mutation, jsonBody, json, failure, HttpError } from '@/lib/http';
 import { clientIp } from '@/lib/client-ip';
 import { checkFormToken, formTokenUsed, markFormTokenUsed } from '@/lib/form-token';
@@ -11,10 +11,12 @@ import { PRIVACY_VERSION } from '@/lib/i18n';
 const refresh = 'Страница оформления устарела. Обновите страницу и отправьте заказ ещё раз.';
 // Rule for this route: 201 with an id only after the order is written to the database.
 // When it cannot be stored, the customer gets an error and keeps the cart, plus the WhatsApp link.
-const notAccepted = (error = 'Не удалось оформить заказ. Попробуйте позже или напишите нам в WhatsApp.') => json({ error, whatsapp: whatsappLink() }, 429);
+const notAccepted = (error = 'Не удалось оформить заказ. Попробуйте позже или напишите нам в WhatsApp.', status = 429) => json({ error, whatsapp: whatsappLink() }, status);
 export async function POST(request: NextRequest) {
   try {
     mutation(request);
+    // Without the order key contacts cannot be stored encrypted, so no order is taken at all.
+    if (!hasOrderKey()) { console.error('BOTA order rejected: order-key is missing. Create it with npm run key:create.'); return notAccepted(undefined, 503); }
     const { website, formToken, ...input } = orderSchema.parse(await jsonBody(request));
     const token = checkFormToken(formToken);
     // Honeypot or a missing/forged token: kept in quarantine (status "spam") for the owner to review.

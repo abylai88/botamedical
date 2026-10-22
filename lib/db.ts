@@ -1,6 +1,6 @@
 import 'server-only';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import type { Product, Order } from './types.ts';
@@ -78,16 +78,13 @@ export function product(id: string): Product | undefined {
   const row = db().prepare('SELECT data FROM products WHERE id=?').get(id) as { data: string } | undefined;
   return row ? JSON.parse(row.data) : undefined;
 }
+// The order key is created once by `npm run key:create` during installation, never by the site itself:
+// a key made silently on the first order could be missing from the owner's safe copies.
+const orderKeyFile = () => join(dataDir, 'order-key');
+export function hasOrderKey() { return existsSync(orderKeyFile()); }
 function encryptionKey() {
-  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-  const file = join(dataDir, 'order-key');
-  if (!existsSync(file)) {
-    if ((db().prepare('SELECT count(*) AS count FROM orders').get() as { count: number }).count > 0) throw new Error('Order key missing: restore the original key from a protected backup');
-    // Exclusive creation handles two workers starting together. Never replace an existing key.
-    try { writeFileSync(file, randomBytes(32), { flag: 'wx', mode: 0o600 }); }
-    catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e; }
-  }
-  const key = readFileSync(file);
+  if (!hasOrderKey()) throw new Error('Order key missing: create it with npm run key:create or restore the original key');
+  const key = readFileSync(orderKeyFile());
   if (key.length !== 32) throw new Error('Invalid local encryption key');
   return key;
 }

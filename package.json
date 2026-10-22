@@ -12,6 +12,7 @@
     "start": "node scripts/run-next.mjs start",
     "typecheck": "tsc --noEmit",
     "admin:create": "node --conditions=react-server scripts/admin.mjs",
+    "key:create": "node scripts/order-key.mjs",
     "assets": "node scripts/assets.mjs",
     "test": "node --conditions=react-server --test tests/*.test.mjs"
   },

@@ -1,14 +1,18 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
 
 process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
+// Installation step: the order key is created by an explicit command; the site never makes one itself.
+const keyScript = () => spawnSync(process.execPath, ['scripts/order-key.mjs'], { env: process.env, encoding: 'utf8' });
+const keyCreated = keyScript(); assert.equal(keyCreated.status, 0, keyCreated.stderr); assert.match(keyCreated.stdout, /order-key created/);
 const { db, products, product, orders, orderPage, orderCounts, purgeOldSpam, encrypt, digest } = await import('../lib/db.ts');
 const { issueFormToken } = await import('../lib/form-token.ts');
 const { hashPassword, verifyPassword, session } = await import('../lib/auth.ts');
@@ -129,6 +133,17 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/orders', 'POST', { ...payload, items: [payload.items[0], payload.items[0]] })).status, 400);
     assert.equal((await request('/api/orders', 'POST', { ...payload, customer: { ...payload.customer, note: 'x'.repeat(40000) } })).status, 413);
     assert.equal(orderSchema.safeParse({ ...payload, total: 1 }).success, false);
+  });
+  await t.test('order key is never replaced or created by the site; without it no order is taken', async () => {
+    const keyFile = join(process.env.BOTA_DATA_DIR, 'order-key'); const original = await readFile(keyFile);
+    const again = keyScript(); assert.equal(again.status, 0); assert.match(again.stdout, /already exists/); assert.deepEqual(await readFile(keyFile), original);
+    const count = () => db().prepare('SELECT count(*) AS c FROM orders').get().c; const saved = count();
+    await rename(keyFile, keyFile + '.away');
+    try {
+      const response = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.150'));
+      assert.equal(response.status, 503); assert.match((await response.json()).error, /Не удалось оформить заказ/);
+      assert.equal(existsSync(keyFile), false, 'The site must not create a key by itself'); assert.equal(count(), saved);
+    } finally { await rename(keyFile + '.away', keyFile); }
   });
   await t.test('order persistence, authoritative totals, encryption and retry idempotency', async () => {
     const response = await request('/api/orders', 'POST', payload); assert.equal(response.status, 201); savedId = (await response.json()).id;
