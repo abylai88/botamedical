@@ -39,4 +39,13 @@ jobs:
       - name: ShellCheck
         run: shellcheck -S warning deploy/*.sh deploy/tests/*.sh
       - name: Тесты скриптов деплоя
-        run: bash deploy/tests/run.sh
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! bash deploy/tests/run.sh 2>&1 | tee deploy-tests.log; then
+            # Показать упавшие проверки как аннотации, чтобы их было видно без скачивания логов.
+            grep -E 'FAIL|passed' deploy-tests.log | head -n 10 | sed 's/^ *//; s/^/::error title=deploy tests::/'
+            grep -E '^ +\|' deploy-tests.log | head -n 20 | tr '\n' ' ' | sed 's/^/::error title=deploy tests output::/'
+            echo
+            exit 1
+          fi
