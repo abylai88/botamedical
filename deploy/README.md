@@ -175,25 +175,40 @@ caddy version
 
 ---
 
-## 3. Пользователь сайта и код
+## 3. Пользователи, код и служебные скрипты
 
-Сайт работает от отдельного системного пользователя `bota`: без пароля, без входа по SSH, без sudo.
-Если сайт взломают, злоумышленник получит только права `bota`.
+На сервере три «участника», у каждого только свои права:
+
+| Кто | Что может | Зачем |
+|---|---|---|
+| `root` (через `sudo`) | всё; владеет кодом сайта и служебными скриптами | обновление, бэкап-скрипты, восстановление |
+| `bota-build` | писать только в папку новой версии во время её сборки | `npm ci` и сборка сайта не работают от root |
+| `bota` | **читать** код, писать только в `/var/lib/bota` (данные) и `/var/cache/bota` (кеш картинок) | от него работает сайт |
+
+Если сайт взломают, злоумышленник получит права `bota`: не сможет изменить ни код, ни скрипты, которые потом
+запускает root, ни системные файлы.
 
 ```bash
-# Сервер
-sudo adduser --system --group --home /srv/bota --shell /usr/sbin/nologin bota
-sudo chmod 750 /srv/bota
-sudo -u bota -H git clone https://github.com/abylai88/botamedical.git /srv/bota/app
+# Сервер: пользователи без пароля и без входа по SSH
+sudo adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin bota
+sudo adduser --system --group --home /var/cache/bota-build --shell /usr/sbin/nologin bota-build
+
+# Код: репозиторий принадлежит root
+sudo install -d -o root -g root -m 755 /srv/bota
+sudo git clone https://github.com/abylai88/botamedical.git /srv/bota/repo
+
+# Служебные скрипты и службы: копии из репозитория в /usr/local/sbin и /etc/systemd/system, владелец root
+sudo bash /srv/bota/repo/deploy/install.sh
+ls -l /usr/local/sbin/bota-*                   # -rwxr-xr-x root root … bota-update, bota-backup, bota-restore
 
 # Настройки: адрес сайта
 sudo install -d -m 755 /etc/bota
-sudo cp /srv/bota/app/deploy/bota.env.example /etc/bota/bota.env
+sudo cp /srv/bota/repo/deploy/bota.env.example /etc/bota/bota.env
 sudo nano /etc/bota/bota.env  # APP_ORIGIN=https://ваш-домен ; сохранить: Ctrl+O, Enter, выйти: Ctrl+X
 ```
 
-Папка `/srv/bota` закрыта для других пользователей, поэтому команды внутри неё выполняются от имени `bota` так:
-`sudo -u bota -H bash -c 'cd /srv/bota/app && КОМАНДА'`.
+Команды дальше вызываются коротко: `sudo bota-update`, `sudo bota-restore`. Сами скрипты лежат в
+`/usr/local/sbin` и меняются только командой `sudo bash /srv/bota/repo/deploy/install.sh`.
 
 ---
 
@@ -250,7 +265,7 @@ sudo ls -la /var/lib/bota                                                # вл�
 
 # models
 sudo mv ~/bota-models /srv/bota/models
-sudo chown -R bota:bota /srv/bota/models
+sudo chown -R root:root /srv/bota/models      # сайту эти файлы не нужны, доступ только у root
 sudo chmod -R u=rwX,go= /srv/bota/models
 sudo find /srv/bota/models -type f | wc -l     # число файлов = Count из PowerShell
 sudo du -sb /srv/bota/models                   # байты ≈ Sum из PowerShell
@@ -268,22 +283,46 @@ sudo du -sb /srv/bota/models                   # байты ≈ Sum из PowerSh
 
 ```bash
 # Сервер
-sudo -u bota -H bash -c 'cd /srv/bota/app && npm ci --include=dev && npm run build'
-sudo cp /srv/bota/app/deploy/bota.service /etc/systemd/system/bota.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now bota
+sudo systemctl enable bota                     # запускать сайт после перезагрузки сервера
+sudo bota-update                               # первая сборка (1–3 минуты) и запуск
 sudo systemctl status bota --no-pager          # Active: active (running)
 curl http://127.0.0.1:3000/healthz             # {"status":"ok"}
 ```
 
-Служба запускается сама после перезагрузки сервера и перезапускается, если сайт упал.
-Журнал сайта: `sudo journalctl -u bota -n 100 --no-pager`.
+Служба перезапускается сама, если сайт упал. Журнал сайта: `sudo journalctl -u bota -n 100 --no-pager`.
 
 Если данные **не** переносились (новая пустая база), создайте администратора:
 
 ```bash
-sudo -u bota -H bash -c 'cd /srv/bota/app && BOTA_DATA_DIR=/var/lib/bota npm run admin:create'
+cd /srv/bota/app && sudo -u bota env BOTA_DATA_DIR=/var/lib/bota node --conditions=react-server scripts/admin.mjs
 ```
+
+### Проверка изоляции (один раз после первого запуска)
+
+В `bota.service` включены ограничения: только чтение для всей системы, кроме данных и кеша, запрет на
+повышение прав, фильтр системных вызовов и т. п. На компьютере с Windows их проверить нельзя, поэтому
+проверяем на сервере:
+
+```bash
+# Сервер
+# 1. Сайт не может писать в свой код (ожидается: Permission denied)
+sudo -u bota touch /srv/bota/app/test
+# 2. Оценка изоляции от systemd: внизу строка "Overall exposure level" — должно быть OK или MEDIUM, не UNSAFE
+systemd-analyze security bota --no-pager | tail -n 3
+```
+
+3. Откройте в браузере главную, каталог, страницу товара с фотографиями, корзину, оформите тестовый заказ,
+   войдите в `/admin`, загрузите фото товара. Потом удалите тестовый заказ в админке.
+4. Проверьте журнал — после этих действий не должно быть ошибок доступа:
+
+   ```bash
+   sudo journalctl -u bota --since "30 min ago" --no-pager | grep -iE 'EACCES|EPERM|EROFS|read-only|Failed to write' || echo "ошибок доступа нет"
+   ```
+
+Если сайт не запускается или в журнале есть такие ошибки — пришлите вывод
+`sudo journalctl -u bota -n 100 --no-pager`. Временно, для диагностики, можно закомментировать (поставить `#`
+в начале) строку `SystemCallFilter=` в `/etc/systemd/system/bota.service`, затем
+`sudo systemctl daemon-reload && sudo systemctl restart bota`. Если помогло — дело в фильтре вызовов.
 
 ### Про TRUST_PROXY=1
 
@@ -300,7 +339,7 @@ sudo -u bota -H bash -c 'cd /srv/bota/app && BOTA_DATA_DIR=/var/lib/bota npm run
 
 ```bash
 # Сервер
-sudo cp /srv/bota/app/deploy/Caddyfile /etc/caddy/Caddyfile
+sudo cp /srv/bota/repo/deploy/Caddyfile /etc/caddy/Caddyfile
 sudo nano /etc/caddy/Caddyfile                 # замените example.kz на свой домен (почта уже указана)
 sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 sudo systemctl reload caddy
@@ -318,19 +357,26 @@ sudo journalctl -u caddy -n 30 --no-pager      # ищите "certificate obtaine
 
 ```bash
 # Сервер
-sudo bash /srv/bota/app/deploy/update.sh
+sudo bota-update
 ```
 
-Скрипт скачивает изменения, ставит зависимости, собирает сайт и перезапускает его. На время сборки (1–3 минуты)
-сайт недоступен. Если сборка не удалась, скрипт сам возвращает предыдущую версию.
+Скрипт скачивает изменения в `/srv/bota/repo`, собирает новую версию в отдельной папке (от имени `bota-build`,
+пока сайт работает на старой), передаёт её root и переключает сайт на неё. Если сборка не удалась, сайт
+остаётся на прежней версии.
 
-Помните: всё, что попало в `main`, после `update.sh` окажется на сайте.
+Если в новой версии изменились служебные скрипты или службы, `bota-update` напишет об этом. Тогда выполните:
+
+```bash
+sudo bash /srv/bota/repo/deploy/install.sh && sudo systemctl restart bota
+```
+
+Помните: всё, что попало в `main`, после `bota-update` окажется на сайте.
 
 ---
 
 ## 8. Резервные копии: настройка (один раз)
 
-Каждую ночь около 03:30 скрипт `deploy/backup.sh` делает копию базы (через `sqlite3 .backup` — это
+Каждую ночь около 03:30 команда `bota-backup` (скрипт `deploy/backup.sh`) делает копию базы (через `sqlite3 .backup` — это
 правильная копия даже во время работы сайта) и папки `uploads`, шифрует её и кладёт в `/var/backups/bota`.
 Хранятся 14 последних копий, старые удаляются сами.
 
@@ -383,10 +429,10 @@ shred -u ~/bota-backup-key.txt
 
 ### 8.3. Включаем ежедневный запуск
 
+Службу и таймер уже установил `install.sh` (шаг 3).
+
 ```bash
 # Сервер
-sudo cp /srv/bota/app/deploy/bota-backup.service /srv/bota/app/deploy/bota-backup.timer /etc/systemd/system/
-sudo systemctl daemon-reload
 sudo systemctl start bota-backup.service                # первая копия прямо сейчас
 sudo journalctl -u bota-backup -n 20 --no-pager         # "Готово: /var/backups/bota/bota-…"
 ls -l /var/backups/bota
@@ -426,7 +472,7 @@ Get-ChildItem $dest | Sort-Object LastWriteTime -Descending | Format-Table Name,
 
 ## 10. Восстановление сайта из копии
 
-Скрипт `deploy/restore.sh` расшифровывает копию, проверяет базу, останавливает сайт, **откладывает**
+Команда `bota-restore` (скрипт `deploy/restore.sh`) расшифровывает копию, проверяет базу, останавливает сайт, **откладывает**
 текущие данные в `/var/lib/bota/before-restore-ДАТА` (ничего не удаляет), кладёт данные из копии и запускает сайт.
 
 ### Если сервер новый
@@ -458,7 +504,7 @@ scp "E:\bota-backup-key.txt" abylai@IP_СЕРВЕРА:
 
 ```bash
 # Сервер
-sudo bash /srv/bota/app/deploy/restore.sh ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
+sudo bota-restore ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
 # Только на новом сервере: открытый ключ для будущих копий
 age-keygen -y ~/bota-backup-key.txt | sudo tee /etc/bota/backup-recipient.txt
 shred -u ~/bota-backup-key.txt          # секретный ключ на сервере не оставляем

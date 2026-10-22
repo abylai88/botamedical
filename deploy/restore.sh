@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Восстановление базы и загруженных фото из зашифрованной копии (см. deploy/README.md, раздел 10).
-# Запуск: sudo bash /srv/bota/app/deploy/restore.sh ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
+# Устанавливается deploy/install.sh в /usr/local/sbin/bota-restore. Запуск: sudo bota-restore ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
 # Текущие данные не удаляются, а откладываются в /var/lib/bota/before-restore-ДАТА.
 set -euo pipefail
 

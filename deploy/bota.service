@@ -1,4 +1,4 @@
-# Сайт BOTA как служба systemd. Копируется в /etc/systemd/system/bota.service (см. deploy/README.md).
+# Сайт BOTA как служба systemd. Устанавливается deploy/install.sh в /etc/systemd/system/bota.service.
 [Unit]
 Description=BOTA — сайт медицинской одежды
 After=network-online.target
@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=simple
 User=bota
 Group=bota
+# Код принадлежит root: пользователь bota может его только читать.
 WorkingDirectory=/srv/bota/app
 # Сайт слушает только 127.0.0.1: снаружи к нему ходит лишь Caddy.
 Environment=NODE_ENV=production
@@ -25,15 +26,41 @@ Restart=on-failure
 RestartSec=5
 TimeoutStopSec=20
 
-# /var/lib/bota создаёт systemd, доступ только у пользователя bota.
+# Писать сайт может только в свои данные (/var/lib/bota) и кеш картинок Next.js (/var/cache/bota,
+# туда ведёт ссылка .next/cache). Обе папки создаёт systemd, доступ только у bota.
 StateDirectory=bota
 StateDirectoryMode=0700
+CacheDirectory=bota
+CacheDirectoryMode=0700
 UMask=0077
-# Ограничения: сайт не может получить права root, не видит /home и /root, не пишет в системные папки.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bota /var/cache/bota
+
+# Изоляция: даже взломанный сайт не получит прав root, не увидит /home и /root,
+# не тронет ядро, устройства и чужие процессы.
 NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
 PrivateTmp=true
-ProtectSystem=full
+PrivateDevices=true
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+# Запрещённый системный вызов возвращает ошибку, а не убивает процесс: Node.js в таком случае
+# сам выбирает обходной путь.
+SystemCallErrorNumber=EPERM
+# MemoryDenyWriteExecute не включаем: движок V8 в Node.js создаёт исполняемый код на лету.
 
 [Install]
 WantedBy=multi-user.target

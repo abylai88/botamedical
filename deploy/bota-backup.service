@@ -1,5 +1,5 @@
 # Одна зашифрованная резервная копия. Запускается таймером bota-backup.timer.
-# Копируется в /etc/systemd/system/ (см. deploy/README.md, раздел 8).
+# Устанавливается deploy/install.sh в /etc/systemd/system/ (см. deploy/README.md, раздел 8).
 [Unit]
 Description=BOTA: зашифрованная резервная копия базы и фото
 
@@ -11,10 +11,31 @@ Environment=BOTA_DATA_DIR=/var/lib/bota
 Environment=BOTA_BACKUP_DIR=/var/backups/bota
 Environment=BOTA_BACKUP_RECIPIENT=/etc/bota/backup-recipient.txt
 Environment=BOTA_BACKUP_KEEP=14
-ExecStart=/bin/bash /srv/bota/app/deploy/backup.sh
+# Скрипт принадлежит root (устанавливает deploy/install.sh): сайт не может его подменить.
+ExecStart=/usr/local/sbin/bota-backup
 Nice=10
 IOSchedulingClass=idle
+
+# sqlite3 нужна запись рядом с базой (служебный файл -shm), сама копия пишется в /var/backups/bota.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bota /var/backups/bota
+# Копии сеть не нужна.
+PrivateNetwork=true
 NoNewPrivileges=true
+CapabilityBoundingSet=
 PrivateTmp=true
-ProtectSystem=full
+PrivateDevices=true
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
