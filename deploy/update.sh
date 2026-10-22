@@ -86,6 +86,8 @@ main() {
 # Сборка в папке dir. Каждый шаг проверяется явно: внутри `if !` bash не останавливается на ошибках сам.
 build() {
   local sha=$1 dir=$2 name=$3 tmp
+  # На всякий случай — никаких оставшихся процессов сборщика от прошлых запусков.
+  pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
   install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 755 "$dir" || return 1
   git -C "$REPO" archive "$sha" | sudo -u "$BUILD_USER" tar -x -C "$dir" || return 1
   # Сборка не видит настоящие данные: ей даётся пустая временная папка.
@@ -93,6 +95,8 @@ build() {
   chown "$BUILD_USER" "$tmp" || return 1
   if ! (cd "$dir" && sudo -u "$BUILD_USER" -H env BOTA_DATA_DIR="$tmp" npm ci --include=dev \
         && sudo -u "$BUILD_USER" -H env BOTA_DATA_DIR="$tmp" npm run build); then
+    # Сборка упала: процессы сборщика всё равно завершаем, чтобы они не тронули следующие сборки.
+    pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
     rm -rf "$tmp"; return 1
   fi
   rm -rf "$tmp"
