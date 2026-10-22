@@ -38,6 +38,8 @@ test('import:scrubs creates products from photos, hides the old category and is 
   assert.match(dry.stdout, /Photos checked: 2/);
   assert.ok(!rows().some(p => p.id.startsWith('scrubs-')));
 
+  const noDb = spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest, '--apply'], { env: { ...process.env, BOTA_DATA_DIR: join(root, 'nowhere') }, encoding: 'utf8' });
+  assert.equal(noDb.status, 1, 'No import into a folder without the shop database'); assert.ok(!existsSync(join(root, 'nowhere')));
   const applied = run('--apply'); assert.equal(applied.status, 0, applied.stderr); assert.match(applied.stdout, /Done: created 2, hidden 3/);
   const all = rows(); const scrubs = all.filter(p => p.id.startsWith('scrubs-'));
   assert.deepEqual(scrubs.map(p => p.id), ['scrubs-test-a', 'scrubs-test-b'], 'Manifest order is kept');

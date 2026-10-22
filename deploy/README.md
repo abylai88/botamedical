@@ -319,6 +319,17 @@ shred -u ~/order-key
 
 ---
 
+### 4.4. Импорт хирургических костюмов (если не сделан на компьютере)
+
+Обычно костюмы импортируются на компьютере (`npm.cmd run import:scrubs -- <папка с фото>`), и папка `.local` переносится уже с ними. Если импорт нужен на сервере: скопируйте фото в папку, которую может читать пользователь `bota` (например `/var/lib/bota/import`), и запускайте **от имени bota**, не от root — иначе сайт не сможет показать фото:
+
+```bash
+# Сервер, после шага 5 (сайт уже запускался)
+cd /srv/bota/current
+sudo -u bota env BOTA_DATA_DIR=/var/lib/bota/data node --conditions=react-server scripts/import-scrubs.mjs /var/lib/bota/import            # проверка
+sudo -u bota env BOTA_DATA_DIR=/var/lib/bota/data node --conditions=react-server scripts/import-scrubs.mjs /var/lib/bota/import --apply    # импорт
+```
+
 ## 5. Сборка и запуск сайта (systemd)
 
 ```bash

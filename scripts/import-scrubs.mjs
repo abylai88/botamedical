@@ -22,6 +22,8 @@ const manifestFile = resolve(manifestAt >= 0 ? args[manifestAt + 1] : 'scripts/i
 const folder = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--manifest');
 if (!folder) { console.error('Usage: npm run import:scrubs -- <photo folder> [--apply]'); process.exit(1); }
 const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
+// Files written as root would be unreadable for the site (user bota): photos would answer 404.
+if (process.getuid?.() === 0) { console.error('Do not run as root. On the server: sudo -u bota env BOTA_DATA_DIR=/var/lib/bota/data npm run import:scrubs -- <folder>'); process.exit(1); }
 
 const sleeveText = { short: ['Короткий рукав.', 'Short sleeves.'], long: ['Длинный рукав с манжетами на резинке.', 'Long sleeves with elastic cuffs.'] };
 const fill = (template, trim) => template.replace('{trim}', trim || '');
@@ -57,6 +59,9 @@ async function photo(file) {
 }
 
 const dbFile = join(dataDir, 'bota.sqlite');
+console.log(`Data folder: ${dataDir}`);
+// The import goes into the shop's existing database; a missing one usually means the wrong folder or BOTA_DATA_DIR.
+if (apply && !existsSync(dbFile)) { console.error(`No shop database in ${dataDir}. Start the site once, or set BOTA_DATA_DIR to the right folder.`); process.exit(1); }
 // Dry run: a consistent snapshot of the database in a temporary folder; without a database everything is new.
 // While the site runs (its -wal/-shm exist) the snapshot is taken with SQLite's backup API from a read-only
 // connection, so a write or checkpoint during the copy cannot mix states. Without -wal no one has the database
