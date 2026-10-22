@@ -1,0 +1,39 @@
+# Сайт BOTA как служба systemd. Копируется в /etc/systemd/system/bota.service (см. deploy/README.md).
+[Unit]
+Description=BOTA — сайт медицинской одежды
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bota
+Group=bota
+WorkingDirectory=/srv/bota/app
+# Сайт слушает только 127.0.0.1: снаружи к нему ходит лишь Caddy.
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=BOTA_BIND_HOST=127.0.0.1
+Environment=NEXT_TELEMETRY_DISABLED=1
+# Данные сайта (то же, что .local на компьютере): база, order-key, загруженные фото.
+Environment=BOTA_DATA_DIR=/var/lib/bota
+# Сайт стоит за одним доверенным прокси (Caddy), лимиты считаются по IP посетителя.
+Environment=TRUST_PROXY=1
+# Адрес сайта (APP_ORIGIN) — в этом файле, он у каждого сервера свой.
+EnvironmentFile=/etc/bota/bota.env
+ExecStart=/usr/bin/node scripts/run-next.mjs start
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+# /var/lib/bota создаёт systemd, доступ только у пользователя bota.
+StateDirectory=bota
+StateDirectoryMode=0700
+UMask=0077
+# Ограничения: сайт не может получить права root, не видит /home и /root, не пишет в системные папки.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

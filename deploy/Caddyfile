@@ -1,0 +1,20 @@
+# Caddy: HTTPS с автоматическим сертификатом Let's Encrypt и передача запросов сайту.
+# Копируется в /etc/caddy/Caddyfile. Замените example.kz на свой домен (в двух местах)
+# и укажите свою почту: на неё придут письма о сертификате, если что-то пойдёт не так.
+{
+	email [ЗАПОЛНИТЬ: ваша почта]
+}
+
+example.kz {
+	encode zstd gzip
+	# Браузер будет открывать сайт только по HTTPS.
+	header Strict-Transport-Security "max-age=31536000"
+	# Caddy сам дописывает IP посетителя в X-Forwarded-For, а присланный посетителем заголовок
+	# не принимает на веру — поэтому сайту можно включать TRUST_PROXY=1.
+	reverse_proxy 127.0.0.1:3000
+}
+
+# www.example.kz → example.kz
+www.example.kz {
+	redir https://example.kz{uri} permanent
+}
