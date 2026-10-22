@@ -161,14 +161,20 @@ test('server flows, persistence, validation and security boundaries', async t =>
   await t.test('readyz and db:verify catch an order key that cannot open the saved orders', async () => {
     assert.ok(orders().length > 0, 'Needs a saved order');
     const ready = await request('/readyz'); assert.equal(ready.status, 200); assert.deepEqual(await ready.json(), { status: 'ready' });
-    const ok = dbVerify(); assert.equal(ok.status, 0, ok.stderr); assert.match(ok.stdout, /^OK: .* 1 newest orders decrypted/); assert.ok(!ok.stdout.includes(payload.customer.name));
+    const ok = dbVerify(); assert.equal(ok.status, 0, ok.stderr); assert.match(ok.stdout, /^OK: .* 1 orders decrypted/); assert.ok(!ok.stdout.includes(payload.customer.name));
     const keyFile = join(process.env.BOTA_DATA_DIR, 'order-key'); const original = await readFile(keyFile);
     await writeFile(keyFile, randomBytes(32));
     try {
       const wrong = await request('/readyz'); assert.equal(wrong.status, 503); assert.deepEqual(await wrong.json(), { status: 'not ready' });
-      const failed = dbVerify(); assert.equal(failed.status, 1); assert.match(failed.stderr, /1 of 1 newest orders cannot be decrypted/); assert.ok(!failed.stderr.includes(payload.customer.name));
+      const failed = dbVerify(); assert.equal(failed.status, 1); assert.match(failed.stderr, /1 of 1 orders cannot be decrypted/); assert.ok(!failed.stderr.includes(payload.customer.name));
     } finally { await writeFile(keyFile, original); }
     assert.equal((await request('/readyz')).status, 200);
+    // An old damaged order (not the newest) is still caught by db:verify, which checks every order.
+    db().prepare("INSERT INTO orders (id, request_id, request_hash, created, status, payload) VALUES ('old-damaged', 'old-damaged', 'x', '2000-01-01T00:00:00.000Z', 'new', 'not-a-valid-payload')").run();
+    try {
+      const damaged = dbVerify(); assert.equal(damaged.status, 1); assert.match(damaged.stderr, /1 of 2 orders cannot be decrypted/);
+    } finally { db().prepare("DELETE FROM orders WHERE id = 'old-damaged'").run(); }
+    assert.equal(dbVerify().status, 0);
   });
   await t.test('comments under each look: public post, validation, staff badge, moderation', async () => {
     const admin = cookie; cookie = '';
