@@ -4,7 +4,8 @@
 #   deploy/backup.sh  → /usr/local/sbin/bota-backup
 #   deploy/restore.sh → /usr/local/sbin/bota-restore
 #   deploy/backup-prune.sh → /usr/local/sbin/bota-backup-prune
-#   bota.service, bota-backup.service/.timer, bota-backup-prune.service/.timer → /etc/systemd/system/
+#   bota.service, bota-backup.service/.timer, bota-backup-prune.service/.timer,
+#   bota-spam-purge.service/.timer → /etc/systemd/system/
 # Все файлы принадлежат root: пользователь сайта bota не может их изменить.
 # Запуск: sudo bash /srv/bota/repo/deploy/install.sh
 set -euo pipefail
@@ -22,7 +23,8 @@ fi
 for name in update backup restore backup-prune; do
   install -o root -g root -m 0755 "$SRC/$name.sh" "/usr/local/sbin/bota-$name"
 done
-for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune.service bota-backup-prune.timer; do
+for unit in bota.service bota-backup.service bota-backup.timer bota-backup-prune.service bota-backup-prune.timer \
+  bota-spam-purge.service bota-spam-purge.timer; do
   install -o root -g root -m 0644 "$SRC/$unit" "/etc/systemd/system/$unit"
 done
 systemctl daemon-reload
