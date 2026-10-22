@@ -1,0 +1,42 @@
+# Автоматическая проверка на серверах GitHub при каждом PR и пуше в main.
+# Ничего не публикует и не деплоит: только сборка, тесты и проверка серверных скриптов.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Сборка и тесты сайта
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  deploy-scripts:
+    name: Серверные скрипты (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        run: shellcheck -S warning deploy/*.sh deploy/tests/*.sh
+      - name: Тесты скриптов деплоя
+        run: bash deploy/tests/run.sh
