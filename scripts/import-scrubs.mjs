@@ -4,9 +4,11 @@
 // exactly like an upload in the admin panel (rotate, fit 2000x2400, WebP). Products of the category in
 // "hideCategory" are hidden, not deleted. Without --apply nothing is written: it only checks and prints the plan.
 // Safe to run again: products that already exist are skipped. BOTA_DATA_DIR selects the data folder.
+// The dry run opens an existing database read-only and never creates or seeds one.
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
 import { db, dataDir } from '../lib/db.ts';
 import { productSchema } from '../lib/validation.ts';
@@ -52,13 +54,16 @@ async function photo(file) {
   return pipeline.rotate().resize({ width: 2000, height: 2400, fit: 'inside', withoutEnlargement: true }).webp({ quality: 86 }).toBuffer();
 }
 
-const database = db();
-const exists = id => Boolean(database.prepare('SELECT 1 FROM products WHERE id=?').get(id));
+const dbFile = join(dataDir, 'bota.sqlite');
+// Dry run: read-only, and without a database everything is simply planned as new.
+const database = apply ? db() : existsSync(dbFile) ? new DatabaseSync(dbFile, { readOnly: true }) : null;
+if (!database) console.log(`No database yet in ${dataDir}: it is created on --apply.`);
+const productRows = () => database ? database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data)) : [];
+const exists = id => Boolean(database?.prepare('SELECT 1 FROM products WHERE id=?').get(id));
 const plan = manifest.items.map(item => ({ item, file: join(folder, item.file), skip: exists(item.id) }));
 const missing = plan.filter(p => !p.skip && !existsSync(p.file));
 if (missing.length) { console.error(`Missing photos:\n${missing.map(p => '  ' + p.file).join('\n')}`); process.exit(1); }
-const toHide = database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data))
-  .filter(p => p.category === manifest.hideCategory && p.active);
+const toHide = productRows().filter(p => p.category === manifest.hideCategory && p.active);
 
 const [category, categoryEn] = manifest.category;
 const created = [];
@@ -78,9 +83,11 @@ const uploads = join(dataDir, 'uploads'); mkdirSync(uploads, { recursive: true, 
 const written = [];
 try {
   for (const c of created) {
-    const name = `${randomUUID()}.webp`;
-    writeFileSync(join(uploads, name), await photo(c.file), { flag: 'wx', mode: 0o600 });
-    written.push(name); c.product.images = [`/media/${name}`]; c.media = name;
+    const name = `${randomUUID()}.webp`; const image = await photo(c.file);
+    // Registered before writing: a partly written file is removed on failure too.
+    written.push(name);
+    writeFileSync(join(uploads, name), image, { flag: 'wx', mode: 0o600 });
+    c.product.images = [`/media/${name}`]; c.media = name;
   }
   database.exec('BEGIN IMMEDIATE');
   try {

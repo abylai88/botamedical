@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -27,8 +27,15 @@ test('import:scrubs creates products from photos, hides the old category and is 
   const run = (...extra) => spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest, ...extra], { env: { ...process.env, BOTA_DATA_DIR: data }, encoding: 'utf8' });
   const rows = () => { const d = new DatabaseSync(join(data, 'bota.sqlite')); try { return d.prepare('SELECT id, data FROM products ORDER BY rowid').all().map(r => JSON.parse(r.data)); } finally { d.close(); } };
 
-  const dry = run(); assert.equal(dry.status, 0, dry.stderr); assert.match(dry.stdout, /Create: 2/); assert.match(dry.stdout, /Dry run/);
-  assert.ok(!rows().some(p => p.id.startsWith('scrubs-')), 'Dry run writes nothing');
+  const fresh = run(); assert.equal(fresh.status, 0, fresh.stderr); assert.match(fresh.stdout, /Create: 2/);
+  assert.ok(!existsSync(join(data, 'bota.sqlite')), 'Dry run on an empty folder creates no database');
+  // A seeded database, then a dry run must leave it byte-for-byte unchanged.
+  const seed = spawnSync(process.execPath, ['--conditions=react-server', '-e', "import('./lib/db.ts').then(m => m.db())"], { env: { ...process.env, BOTA_DATA_DIR: data }, encoding: 'utf8' });
+  assert.equal(seed.status, 0, seed.stderr);
+  const before = readFileSync(join(data, 'bota.sqlite'));
+  const dry = run(); assert.equal(dry.status, 0, dry.stderr); assert.match(dry.stdout, /Create: 2, already exist: 0, hide "Образы": 3/); assert.match(dry.stdout, /Dry run/);
+  assert.ok(readFileSync(join(data, 'bota.sqlite')).equals(before), 'Dry run writes nothing');
+  assert.ok(!rows().some(p => p.id.startsWith('scrubs-')));
 
   const applied = run('--apply'); assert.equal(applied.status, 0, applied.stderr); assert.match(applied.stdout, /Done: created 2, hidden 3/);
   const all = rows(); const scrubs = all.filter(p => p.id.startsWith('scrubs-'));
