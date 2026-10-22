@@ -91,10 +91,16 @@ build() {
     rm -rf "$tmp"; return 1
   fi
   rm -rf "$tmp"
-  # Кеш картинок Next.js у каждой версии свой, в /var/cache/bota — туда сайту можно писать.
-  install -d -o "$SITE_USER" -g "$SITE_USER" -m 700 "$CACHE" "$CACHE/$name" || return 1
+  # Сборщик мог оставить запущенные процессы: завершаем их, прежде чем root возьмёт папку себе.
+  pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
+  # Кеш картинок Next.js у каждой версии свой, в /var/cache/bota — туда пишет сайт. Внутри этой папки
+  # всё делается от имени bota, чтобы root не следовал по подложенным туда ссылкам.
+  if [ ! -e "$CACHE" ]; then install -d -o "$SITE_USER" -g "$SITE_USER" -m 700 "$CACHE" || return 1; fi
+  if [ "$(stat -c %F -- "$CACHE")" != directory ]; then echo "!! $CACHE — не папка (возможно, ссылка)"; return 1; fi
+  sudo -u "$SITE_USER" mkdir -m 700 "$CACHE/$name" || return 1
   rm -rf "$dir/.next/cache" && ln -s "$CACHE/$name" "$dir/.next/cache" || return 1
-  chown -R root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir" || return 1
+  # --no-dereference: ссылки внутри сборки меняют владельца сами, а не то, на что указывают.
+  chown -R --no-dereference root:root "$dir" && chmod -R u+rwX,go+rX,go-w "$dir" || return 1
   echo "$sha" > "$dir/$READY"
 }
 
@@ -131,7 +137,8 @@ rollback_target() {
 # Удаляет папку версии вместе с её кешем.
 discard() {
   local dir=$1
-  rm -rf "$dir" "$CACHE/$(basename "$dir")"
+  rm -rf "$dir"
+  sudo -u "$SITE_USER" rm -rf "$CACHE/$(basename "$dir")"
 }
 
 # Оставляем KEEP последних готовых версий (рабочая не удаляется никогда) и убираем недособранные.

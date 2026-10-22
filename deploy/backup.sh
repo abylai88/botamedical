@@ -26,7 +26,11 @@ mkdir "$work/bota-backup"
 sqlite3 -cmd '.timeout 10000' "$DATA_DIR/bota.sqlite" ".backup '$work/bota-backup/bota.sqlite'"
 check=$(sqlite3 "$work/bota-backup/bota.sqlite" 'PRAGMA integrity_check;')
 if [ "$check" != ok ]; then echo "Копия базы не прошла проверку: $check"; exit 1; fi
-if [ -d "$DATA_DIR/uploads" ]; then cp -a "$DATA_DIR/uploads" "$work/bota-backup/uploads"; fi
+# Только обычные файлы фото: ссылки и прочее в копию не попадают (bota-restore такую копию не примет).
+if [ -d "$DATA_DIR/uploads" ] && [ "$(stat -c %F -- "$DATA_DIR/uploads")" = directory ]; then
+  mkdir "$work/bota-backup/uploads"
+  find "$DATA_DIR/uploads" -maxdepth 1 -type f -exec cp --no-dereference --preserve=timestamps -t "$work/bota-backup/uploads" -- {} +
+fi
 
 # Сначала пишем во временный файл: недописанная копия никогда не выглядит как готовая.
 tar -C "$work" -czf - bota-backup | age -R "$RECIPIENT" -o "$part"

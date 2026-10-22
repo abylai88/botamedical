@@ -3,63 +3,86 @@
 # Устанавливается deploy/install.sh в /usr/local/sbin/bota-restore.
 # Запуск: sudo bota-restore ~/bota-ДАТА.tar.gz.age ~/bota-backup-key.txt
 #
-# Порядок: копия расшифровывается и проверяется во временной папке рядом с данными (тот же раздел диска),
-# пока сайт работает. Только потом: остановка → замена папки data одним переименованием → запуск → /healthz.
-# Прежние данные не удаляются, а откладываются в /var/lib/bota/before-restore-ДАТА. Если на любом шаге
-# после остановки что-то пошло не так, прежние данные возвращаются на место и сайт запускается снова.
+# Порядок: копия расшифровывается и проверяется в папке root (/var/lib/bota-restore, тот же раздел диска,
+# что и данные), пока сайт работает. Только потом: остановка → замена папки data переименованием → запуск.
+# Прежние данные не удаляются, а откладываются в /var/lib/bota-restore/before-restore-ДАТА. Если на любом
+# шаге после остановки что-то пошло не так, прежние данные возвращаются на место и сайт запускается снова.
+#
+# Безопасность: root не доверяет папкам, куда пишет сайт (bota). Из них он ничего не читает сам
+# (order-key читается от имени bota), ссылки вместо файлов и папок — отказ, в архиве допускаются только
+# обычные файлы и папки.
 set -euo pipefail
 
 DATA_ROOT=${BOTA_DATA_ROOT:-/var/lib/bota}
 DATA_DIR="$DATA_ROOT/data"
+WORK_ROOT=${BOTA_RESTORE_ROOT:-/var/lib/bota-restore}
 SITE_USER=${BOTA_SITE_USER:-bota}
 SERVICE=${BOTA_SERVICE:-bota}
 HEALTH_URL=${BOTA_HEALTH_URL:-http://127.0.0.1:3000/healthz}
 
 staging="" aside="" stamp=$(date +%Y%m%d-%H%M%S) switching=0
 
+# Ссылку определяем через stat (не следует по ссылкам), так же как [ -L ].
+is_link() { [ "$(stat -c %F -- "$1" 2>/dev/null)" = "symbolic link" ]; }
+refuse() { echo "!! $1 Сайт не тронут."; exit 1; }
+
 main() {
   if [ "$(id -u)" -ne 0 ]; then echo "Запустите через sudo"; exit 1; fi
   if [ $# -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
     echo "Использование: sudo bota-restore ФАЙЛ_КОПИИ.tar.gz.age ФАЙЛ_СЕКРЕТНОГО_КЛЮЧА"; exit 1
   fi
-  local backup=$1 key=$2
-  # Без order-key заказы в восстановленной базе не прочитать: он в копию не входит и кладётся отдельно.
-  if [ ! -f "$DATA_DIR/order-key" ]; then
+  local backup=$1 key=$2 path
+  for path in "$DATA_ROOT" "$DATA_DIR" "$DATA_DIR/order-key"; do
+    if is_link "$path"; then refuse "$path — ссылка, а не настоящий файл или папка. Отказ."; fi
+  done
+  # Без order-key заказы в восстановленной базе не прочитать: он в копию не входит и берётся с сервера.
+  if ! sudo -u "$SITE_USER" test -f "$DATA_DIR/order-key"; then
     echo "В $DATA_DIR нет order-key. Сначала положите ключ с компьютера (README, раздел 10)."; exit 1
   fi
 
-  # Место: распакованная копия занимает в несколько раз больше сжатой. Старые данные не удаляются,
-  # переключение — переименование, поэтому больше места не понадобится.
+  # Рабочая папка принадлежит root и лежит на том же разделе, что данные: переключение — переименование.
+  if [ ! -e "$WORK_ROOT" ]; then install -d -o root -g root -m 711 "$WORK_ROOT"; fi
+  if is_link "$WORK_ROOT" || [ "$(stat -c '%U' "$WORK_ROOT")" != root ]; then refuse "$WORK_ROOT должна быть папкой root."; fi
+  if [ "$(stat -c %d "$WORK_ROOT")" != "$(stat -c %d "$DATA_ROOT")" ]; then
+    refuse "$WORK_ROOT и $DATA_ROOT на разных разделах диска."
+  fi
+
+  # Место: распакованная копия занимает в несколько раз больше сжатой; старые данные не удаляются.
   local need free
-  need=$(( $(stat -c %s "$backup") * 5 / 1048576 + 100 ))
-  free=$(df -Pm "$DATA_ROOT" | awk 'NR==2 {print $4}')
-  if [ "$free" -lt "$need" ]; then echo "!! Мало места: свободно ${free} МБ, нужно около ${need} МБ. Сайт не тронут."; exit 1; fi
+  need=$(( $(stat -c %s "$backup") * 6 / 1048576 + 100 ))
+  free=$(df -Pm "$WORK_ROOT" | awk 'NR==2 {print $4}')
+  if [ "$free" -lt "$need" ]; then refuse "Мало места: свободно ${free} МБ, нужно около ${need} МБ."; fi
 
   echo "== Расшифровываю и проверяю копию (сайт пока работает)"
-  staging=$(mktemp -d "$DATA_ROOT/restore-XXXXXX")
-  if ! age -d -i "$key" "$backup" | tar -xz -C "$staging"; then
-    echo "!! Не удалось расшифровать копию: не тот ключ или файл повреждён. Сайт не тронут."; exit 1
-  fi
+  staging=$(mktemp -d "$WORK_ROOT/run-XXXXXX")
+  if ! age -d -i "$key" -o "$staging/backup.tar.gz" "$backup"; then refuse "Не удалось расшифровать копию: не тот ключ или файл повреждён."; fi
+  # В архиве допускаются только обычные файлы и папки: никаких ссылок и устройств.
+  local types
+  types=$(tar -tvzf "$staging/backup.tar.gz" | cut -c1 | sort -u | tr -d '\n')
+  if [ -n "$(printf '%s' "$types" | tr -d -- '-d')" ]; then refuse "В копии есть ссылки или особые файлы ($types)."; fi
+  tar -xzf "$staging/backup.tar.gz" -C "$staging" --no-same-owner --no-same-permissions
+  rm -f "$staging/backup.tar.gz"
   local new="$staging/bota-backup"
-  if [ ! -f "$new/bota.sqlite" ]; then echo "!! В копии нет базы. Сайт не тронут."; exit 1; fi
+  if [ ! -f "$new/bota.sqlite" ]; then refuse "В копии нет базы."; fi
+  if [ -n "$(find "$new" ! -type f ! -type d -print -quit)" ]; then refuse "В копии есть ссылки или особые файлы."; fi
   local check
   check=$(sqlite3 "$new/bota.sqlite" 'PRAGMA integrity_check;')
-  if [ "$check" != ok ]; then echo "!! База в копии повреждена: $check. Сайт не тронут."; exit 1; fi
-  cp -p "$DATA_DIR/order-key" "$new/order-key"
-  chown -R "$SITE_USER:$SITE_USER" "$new"
+  if [ "$check" != ok ]; then refuse "База в копии повреждена: $check."; fi
+  # order-key читает bota (с правами сайта), записывает root — в свою папку.
+  sudo -u "$SITE_USER" cat "$DATA_DIR/order-key" > "$new/order-key"
+  if [ "$(stat -c %s "$new/order-key")" != 32 ]; then refuse "order-key на сервере повреждён (не 32 байта)."; fi
+  chown -R --no-dereference "$SITE_USER:$SITE_USER" "$new"
   chmod -R u=rwX,go= "$new"
 
   echo "== Останавливаю сайт и подменяю данные"
-  aside="$DATA_ROOT/before-restore-$stamp"
+  aside="$WORK_ROOT/before-restore-$stamp"
   switching=1
   systemctl stop "$SERVICE"
-  mv "$DATA_DIR" "$aside"
-  mv "$new" "$DATA_DIR"
+  mv -T "$DATA_DIR" "$aside"
+  mv -T "$new" "$DATA_DIR"
   echo "== Запускаю сайт"
   systemctl start "$SERVICE"
   healthy
-  # Сайт видит базу с правами bota.
-  sudo -u "$SITE_USER" sqlite3 "$DATA_DIR/bota.sqlite" 'SELECT count(*) FROM products;' >/dev/null
   switching=0
 
   echo "== Готово. Прежние данные отложены в $aside"
@@ -83,8 +106,8 @@ finish() {
     echo "!! Восстановление не удалось. Возвращаю прежние данные."
     systemctl stop "$SERVICE" || true
     if [ -n "$aside" ] && [ -d "$aside" ]; then
-      if [ -e "$DATA_DIR" ]; then mv "$DATA_DIR" "$DATA_ROOT/failed-restore-$stamp"; fi
-      mv "$aside" "$DATA_DIR"
+      if [ -e "$DATA_DIR" ] || is_link "$DATA_DIR"; then mv -T "$DATA_DIR" "$WORK_ROOT/failed-restore-$stamp"; fi
+      mv -T "$aside" "$DATA_DIR"
     fi
     systemctl start "$SERVICE" || true
     if healthy; then echo "!! Сайт работает на прежних данных."; else echo "!! Сайт не отвечает. Журнал: sudo journalctl -u $SERVICE -n 100"; fi
