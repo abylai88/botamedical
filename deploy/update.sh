@@ -26,6 +26,8 @@ READY_URL=${BOTA_READY_URL:-http://127.0.0.1:3000/readyz}
 KEEP=${BOTA_KEEP_RELEASES:-3}
 MIN_FREE_MB=${BOTA_MIN_FREE_MB:-1500}
 LOCK=${BOTA_LOCK:-/run/bota-deploy/deploy.lock}
+# PATH для сборки: только системные папки, без окружения того, кто запустил обновление.
+BUILD_PATH=${BOTA_BUILD_PATH:-/usr/local/bin:/usr/bin:/bin}
 # Метка готовой версии: появляется последним шагом сборки. Без неё папка не считается версией.
 READY=.release-ready
 
@@ -90,11 +92,15 @@ build() {
   pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
   install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 755 "$dir" || return 1
   git -C "$REPO" archive "$sha" | sudo -u "$BUILD_USER" tar -x -C "$dir" || return 1
-  # Сборка не видит настоящие данные: ей даётся пустая временная папка.
+  # Сборка не видит настоящие данные: ей даётся пустая временная папка. Домашняя папка и кеш npm у каждой
+  # сборки тоже свои и потом удаляются: прошлая (возможно, неудачная) сборка не оставит настроек вроде
+  # .npmrc, которые сработали бы при следующей.
   tmp=$(mktemp -d) || return 1
-  chown "$BUILD_USER" "$tmp" || return 1
-  if ! (cd "$dir" && sudo -u "$BUILD_USER" -H env BOTA_DATA_DIR="$tmp" npm ci --include=dev \
-        && sudo -u "$BUILD_USER" -H env BOTA_DATA_DIR="$tmp" npm run build); then
+  chown "$BUILD_USER" "$tmp" && mkdir "$tmp/data" "$tmp/home" && chown "$BUILD_USER" "$tmp/data" "$tmp/home" || { rm -rf "$tmp"; return 1; }
+  local build_env=(env -i PATH="$BUILD_PATH" HOME="$tmp/home" npm_config_cache="$tmp/home/.npm"
+    npm_config_userconfig="$tmp/home/.npmrc" NEXT_TELEMETRY_DISABLED=1 BOTA_DATA_DIR="$tmp/data")
+  if ! (cd "$dir" && sudo -u "$BUILD_USER" "${build_env[@]}" npm ci --include=dev \
+        && sudo -u "$BUILD_USER" "${build_env[@]}" npm run build); then
     # Сборка упала: процессы сборщика всё равно завершаем, чтобы они не тронули следующие сборки.
     pkill -KILL -u "$BUILD_USER" 2>/dev/null || true
     rm -rf "$tmp"; return 1

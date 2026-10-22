@@ -260,6 +260,9 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const second = await request('/api/orders', 'POST', { ...first, requestId: randomUUID() }, from('192.0.2.85'));
     assert.equal(second.status, 400); assert.match((await second.json()).error, /Обновите страницу/);
     assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get(digest(token.split('.')[1])).n, 1, 'Marked used by its random id');
+    // A form shown under an older privacy policy edition is not accepted: the customer reloads and accepts the current one.
+    const oldPolicy = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: issueFormToken(Date.now() - 5000, '20000101') }, from('192.0.2.87'));
+    assert.equal(oldPolicy.status, 400, 'Form from an older policy edition must be reloaded'); assert.match((await oldPolicy.json()).error, /Обновите страницу/);
     // Two customers whose forms rendered in the same millisecond both get through.
     const sameMoment = Date.now() - 5000, a = issueFormToken(sameMoment), b = issueFormToken(sameMoment);
     assert.notEqual(a, b); assert.equal(a.split('.')[0], b.split('.')[0]);

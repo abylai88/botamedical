@@ -55,6 +55,6 @@ S
 stub sudo <<'S'
 #!/usr/bin/env bash
 while [ "${1:0:1}" = - ]; do [ "$1" = -u ] && shift; shift; done
-[ "$1" = env ] && { shift; while [[ "$1" == *=* ]]; do export "$1"; shift; done; }
+[ "$1" = env ] && { shift; [ "$1" = -i ] && shift; while [[ "$1" == *=* ]]; do export "$1"; shift; done; }
 exec "$@"
 S

@@ -5,7 +5,7 @@
 # is a file holding the target path. Everything else is the unchanged script.
 source "$(dirname "$0")/helpers.sh"
 mkdir -p "$T/src/deploy" "$T/srv" "$T/cache"; echo app > "$T/src/package.json"
-export BOTA_REPO="$T/repo" BOTA_RELEASES="$T/srv/releases" BOTA_CURRENT="$T/srv/current" BOTA_CACHE="$T/cache" BOTA_LOCK="$T/lock"
+export BOTA_REPO="$T/repo" BOTA_RELEASES="$T/srv/releases" BOTA_CURRENT="$T/srv/current" BOTA_CACHE="$T/cache" BOTA_LOCK="$T/lock" BOTA_BUILD_PATH="$PATH"
 sed -e 's|readlink -f "\$CURRENT"|cat "$CURRENT"|g' \
     -e 's|if \[ -L "\$CURRENT" \]|if [ -f "$CURRENT" ]|' \
     -e 's|ln -s "\$dir" "\$CURRENT.new"|echo "$dir" > "$CURRENT.new"|' \
@@ -22,6 +22,9 @@ case "$1" in pull) exit 0;; rev-parse) cat "$T/sha";; archive) tar -cf - -C "$T/
 S
 stub npm <<'S'
 #!/usr/bin/env bash
+# Every build gets a fresh HOME: a .npmrc left by an earlier build must never be seen again.
+[ -f "$HOME/.npmrc" ] && echo "$HOME" >> "$T/leftover-npmrc"
+echo "node-options=--require=/tmp/evil.js" > "$HOME/.npmrc"
 if [ "$1" = ci ]; then mkdir -p node_modules; exit 0; fi
 [ -f "$T/buildfail" ] && { echo "build error"; exit 1; }
 mkdir -p .next/cache; echo built > .next/BUILD_ID
@@ -84,6 +87,10 @@ check ".next is a link: nothing written outside" "$(ls -A "$T/elsewhere" | tr '\
 mkdir -p "$T/openlock"; chmod 777 "$T/openlock"; release lllllll3
 out=$(BOTA_LOCK="$T/openlock/deploy.lock" bash "$T/update.sh" 2>&1); code=$?
 check "open lock folder: refused" "$code" 1; check_contains "open lock folder: message" "$out" "закрытой для записи"
+
+# Within one build "npm run build" sees the .npmrc "npm ci" wrote; a later build never does (each HOME once).
+check "build HOME is fresh every time" "$(sort "$T/leftover-npmrc" | uniq -d | wc -l | tr -d ' ')" 0
+check "build HOMEs are removed afterwards" "$(while read -r h; do [ -e "$h" ] && echo "$h"; done < "$T/leftover-npmrc" | wc -l | tr -d ' ')" 0
 
 rm -rf "$T/srv" "$T/cache"; mkdir -p "$T/srv" "$T/cache"; release iiiiiii9; echo iiiiiii9 > "$T/badsha"; run; rm "$T/badsha"
 check "first install not ready: exit" "$code" 1; check_contains "first install not ready: message" "$out" "order-key на месте"
