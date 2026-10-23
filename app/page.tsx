@@ -6,6 +6,7 @@ import { localized } from '@/lib/i18n';
 import { getSiteContent, siteImage, siteTexts } from '@/lib/site';
 import { ProductCard } from '@/components/product-card';
 import { ProductImage } from '@/components/product-image';
+import { SCRUBS_CATEGORY, categoryHref } from '@/lib/categories';
 
 export default async function Home() {
   const { locale, t } = await getDictionary(); const h = t.home;
@@ -14,7 +15,7 @@ export default async function Home() {
   const lineup = [photo('hero1'), photo('hero2'), photo('hero3')]; const heroBg = content.images.heroBg;
   const reviews = latestPublished(3).map(c => ({ ...c, product: product(c.productId) })).filter(c => c.product?.active);
   const date = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'ru-RU', { dateStyle: 'long', timeZone: 'Europe/Moscow' });
-  const tape = locale === 'en' ? ['Lab coats', 'Looks', 'Team orders'] : ['Халаты', 'Образы', 'Заказы для команды'];
+  const tape = locale === 'en' ? ['Lab coats', 'Surgical scrubs', 'Team orders'] : ['Халаты', 'Хирургические костюмы', 'Заказы для команды'];
   return <>
     <section className={heroBg ? 'hero-team has-photo' : 'hero-team'} aria-labelledby="hero-title">
       <div className="hero-backdrop" aria-hidden="true">{heroBg ? <ProductImage src={heroBg} alt="" priority quality={90} sizes="100vw" /> : null}<span className="hero-wordmark" /></div>
@@ -22,7 +23,7 @@ export default async function Home() {
         <p className="eyebrow">{text('home.kicker')}</p>
         <h1 id="hero-title">{text('home.title')}</h1>
         <p className="hero-lead">{text('home.lead')}</p>
-        <div className="hero-ctas"><Link href="/catalog?category=Халаты" className="button">{text('home.shopCoats')}</Link><Link href="/catalog?category=Образы" className="button secondary">{text('home.shopLooks')}</Link></div>
+        <div className="hero-ctas"><Link href="/catalog?category=Халаты" className="button">{text('home.shopCoats')}</Link><Link href={categoryHref(SCRUBS_CATEGORY)} className="button secondary">{text('home.shopLooks')}</Link></div>
       </div>
       <div className="hero-lineup" role="img" aria-label={h.lineupAlt}>
         {lineup.map((src, i) => <div key={i} className={`lineup-figure lineup-${i + 1}`}><ProductImage src={src} alt="" priority={i === 1} quality={90} sizes="(max-width: 760px) 70vw, 24vw" />{i === 1 ? <span className="hang-tag" aria-hidden="true"><span className="mark-camel" /><span>BOTA</span></span> : null}</div>)}
@@ -33,7 +34,7 @@ export default async function Home() {
 
     <section className="section category-tiles" aria-label={h.categories}>
       <Link href="/catalog?category=Халаты" className="category-tile tile-coat"><span className="tile-photo"><ProductImage src={photo('tileCoats')} alt="" quality={90} sizes="(max-width: 760px) 100vw, 50vw" /></span><span className="tile-copy"><strong>{text('home.coatsTile')}</strong><span>{text('home.coatsText')}</span><em>{h.categoryCta} <span aria-hidden="true">→</span></em></span></Link>
-      <Link href="/catalog?category=Образы" className="category-tile tile-looks"><span className="tile-photo"><ProductImage src={photo('tileLooks')} alt="" quality={90} sizes="(max-width: 760px) 100vw, 50vw" /></span><span className="tile-copy"><strong>{text('home.looksTile')}</strong><span>{text('home.looksText')}</span><em>{h.categoryCta} <span aria-hidden="true">→</span></em></span></Link>
+      <Link href={categoryHref(SCRUBS_CATEGORY)} className="category-tile tile-looks"><span className="tile-photo"><ProductImage src={photo('tileLooks')} alt="" quality={90} sizes="(max-width: 760px) 100vw, 50vw" /></span><span className="tile-copy"><strong>{text('home.looksTile')}</strong><span>{text('home.looksText')}</span><em>{h.categoryCta} <span aria-hidden="true">→</span></em></span></Link>
     </section>
 
     <section id="collection" className="section popular">

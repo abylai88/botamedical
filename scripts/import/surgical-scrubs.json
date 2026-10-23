@@ -1,0 +1,518 @@
+{
+ "_comment": "Хирургические костюмы для scripts/import-scrubs.mjs. Порядок = порядок в каталоге: сначала короткий рукав, затем длинный, внутри — плавный переход цветов.",
+ "category": [
+  "Хирургические костюмы",
+  "Surgical scrubs"
+ ],
+ "price": 1800000,
+ "sizes": [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "2XL",
+  "3XL",
+  "4XL"
+ ],
+ "hideCategory": "Образы",
+ "models": {
+  "002": [
+   "Рубашка с V-образным вырезом и кнопками на плече, нагрудный карман и два нижних — один с клапаном на кнопке.",
+   "V-neck top with shoulder snaps, a chest pocket and two lower pockets, one with a snap flap."
+  ],
+  "003": [
+   "Рубашка с V-образным вырезом, нагрудный и два нижних кармана с контрастным кантом.",
+   "V-neck top with a chest pocket and two lower pockets trimmed with contrast piping."
+  ],
+  "004": [
+   "Рубашка с фигурным V-образным вырезом и {trim} отделкой, нагрудный карман и два прорезных кармана.",
+   "Top with a notched V-neck and {trim} trim, a chest pocket and two welt pockets."
+  ],
+  "005": [
+   "Рубашка с круглым вырезом, {trim} окантовкой горловины и кнопками на плече, нагрудный и два нижних кармана.",
+   "Round-neck top with {trim} neckline trim and shoulder snaps, a chest pocket and two lower pockets."
+  ],
+  "006": [
+   "Рубашка с V-образным вырезом, нагрудный и два вместительных нижних кармана.",
+   "V-neck top with a chest pocket and two roomy lower pockets."
+  ],
+  "008": [
+   "Рубашка с V-образным вырезом и кокеткой, два нижних кармана, на одном — контрастная треугольная вставка.",
+   "V-neck top with a yoke and two lower pockets, one with a contrast triangle insert."
+  ],
+  "009": [
+   "Рубашка с V-образным вырезом и контрастным кантом по плечам, нагрудный и два нижних кармана.",
+   "V-neck top with contrast piping across the shoulders, a chest pocket and two lower pockets."
+  ]
+ },
+ "items": [
+  {
+   "file": "002-matcha-short.png",
+   "id": "scrubs-002-matcha-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "фисташковый",
+    "pistachio"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-green-short.png",
+   "id": "scrubs-002-green-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "изумрудный",
+    "emerald"
+   ],
+   "trim": null
+  },
+  {
+   "file": "006-green-short.png",
+   "id": "scrubs-006-green-short",
+   "model": "006",
+   "sleeve": "short",
+   "color": [
+    "изумрудный",
+    "emerald"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-green-short-sleeve.png",
+   "id": "scrubs-008-green-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "изумрудный",
+    "emerald"
+   ],
+   "trim": null
+  },
+  {
+   "file": "003-green-short.png",
+   "id": "scrubs-003-green-short",
+   "model": "003",
+   "sleeve": "short",
+   "color": [
+    "тёмно-зелёный",
+    "dark green"
+   ],
+   "trim": null
+  },
+  {
+   "file": "005-teal-short-sleeve.png",
+   "id": "scrubs-005-teal-short",
+   "model": "005",
+   "sleeve": "short",
+   "color": [
+    "тёмная бирюза",
+    "deep teal"
+   ],
+   "trim": [
+    "розовой",
+    "pink"
+   ]
+  },
+  {
+   "file": "003-teal-short.png",
+   "id": "scrubs-003-teal-short",
+   "model": "003",
+   "sleeve": "short",
+   "color": [
+    "тёмная бирюза",
+    "deep teal"
+   ],
+   "trim": null
+  },
+  {
+   "file": "009-peacock-short.png",
+   "id": "scrubs-009-peacock-short",
+   "model": "009",
+   "sleeve": "short",
+   "color": [
+    "тёмная бирюза",
+    "deep teal"
+   ],
+   "trim": null
+  },
+  {
+   "file": "006-peacock-short.png",
+   "id": "scrubs-006-peacock-short",
+   "model": "006",
+   "sleeve": "short",
+   "color": [
+    "лазурный",
+    "azure"
+   ],
+   "trim": null
+  },
+  {
+   "file": "004-peacock-pink-short.png",
+   "id": "scrubs-004-peacock-pink-short",
+   "model": "004",
+   "sleeve": "short",
+   "color": [
+    "лазурный",
+    "azure"
+   ],
+   "trim": [
+    "розовой",
+    "pink"
+   ]
+  },
+  {
+   "file": "003-lightblue-short.png",
+   "id": "scrubs-003-lightblue-short",
+   "model": "003",
+   "sleeve": "short",
+   "color": [
+    "голубой",
+    "light blue"
+   ],
+   "trim": null
+  },
+  {
+   "file": "009-palegrayblue-short.png",
+   "id": "scrubs-009-palegrayblue-short",
+   "model": "009",
+   "sleeve": "short",
+   "color": [
+    "серо-голубой",
+    "grey blue"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-blue-short.png",
+   "id": "scrubs-002-blue-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "синий",
+    "blue"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-blue-short-sleeve.png",
+   "id": "scrubs-008-blue-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "синий",
+    "blue"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-navy-short.png",
+   "id": "scrubs-002-navy-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "003-navy-short.png",
+   "id": "scrubs-003-navy-short",
+   "model": "003",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "004-navy-cyan-short.png",
+   "id": "scrubs-004-navy-cyan-short",
+   "model": "004",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": [
+    "голубой",
+    "light blue"
+   ]
+  },
+  {
+   "file": "005-navy-short-sleeve.png",
+   "id": "scrubs-005-navy-short",
+   "model": "005",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": [
+    "голубой",
+    "light blue"
+   ]
+  },
+  {
+   "file": "006-navy-short.png",
+   "id": "scrubs-006-navy-short",
+   "model": "006",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-navy-short-sleeve.png",
+   "id": "scrubs-008-navy-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "009-navy-short.png",
+   "id": "scrubs-009-navy-short",
+   "model": "009",
+   "sleeve": "short",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-lilac-short.png",
+   "id": "scrubs-002-lilac-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "лавандовый",
+    "lavender"
+   ],
+   "trim": null
+  },
+  {
+   "file": "004-lilac-cyan-short.png",
+   "id": "scrubs-004-lilac-cyan-short",
+   "model": "004",
+   "sleeve": "short",
+   "color": [
+    "лавандовый",
+    "lavender"
+   ],
+   "trim": [
+    "голубой",
+    "light blue"
+   ]
+  },
+  {
+   "file": "005-lilac-short-sleeve.png",
+   "id": "scrubs-005-lilac-short",
+   "model": "005",
+   "sleeve": "short",
+   "color": [
+    "лавандовый",
+    "lavender"
+   ],
+   "trim": [
+    "розовой",
+    "pink"
+   ]
+  },
+  {
+   "file": "008-lilac-short-sleeve.png",
+   "id": "scrubs-008-lilac-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "лавандовый",
+    "lavender"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-pink-short.png",
+   "id": "scrubs-002-pink-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "пудрово-розовый",
+    "powder pink"
+   ],
+   "trim": null
+  },
+  {
+   "file": "004-pink-cyan-short.png",
+   "id": "scrubs-004-pink-cyan-short",
+   "model": "004",
+   "sleeve": "short",
+   "color": [
+    "пудрово-розовый",
+    "powder pink"
+   ],
+   "trim": [
+    "голубой",
+    "light blue"
+   ]
+  },
+  {
+   "file": "005-pink-short-sleeve.png",
+   "id": "scrubs-005-pink-short",
+   "model": "005",
+   "sleeve": "short",
+   "color": [
+    "пудрово-розовый",
+    "powder pink"
+   ],
+   "trim": [
+    "розовой",
+    "pink"
+   ]
+  },
+  {
+   "file": "008-pink-short-sleeve.png",
+   "id": "scrubs-008-pink-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "пудрово-розовый",
+    "powder pink"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-plum-short.png",
+   "id": "scrubs-002-plum-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "ягодный",
+    "berry"
+   ],
+   "trim": null
+  },
+  {
+   "file": "006-purple-short.png",
+   "id": "scrubs-006-purple-short",
+   "model": "006",
+   "sleeve": "short",
+   "color": [
+    "сливовый",
+    "plum"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-plum-short-sleeve.png",
+   "id": "scrubs-008-plum-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "сливовый",
+    "plum"
+   ],
+   "trim": null
+  },
+  {
+   "file": "003-plum-short.png",
+   "id": "scrubs-003-plum-short",
+   "model": "003",
+   "sleeve": "short",
+   "color": [
+    "бордовый",
+    "burgundy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-gray-short.png",
+   "id": "scrubs-002-gray-short",
+   "model": "002",
+   "sleeve": "short",
+   "color": [
+    "светло-серый",
+    "light grey"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-gray-short-sleeve.png",
+   "id": "scrubs-008-gray-short",
+   "model": "008",
+   "sleeve": "short",
+   "color": [
+    "светло-серый",
+    "light grey"
+   ],
+   "trim": null
+  },
+  {
+   "file": "009-gray-short.png",
+   "id": "scrubs-009-gray-short",
+   "model": "009",
+   "sleeve": "short",
+   "color": [
+    "серый",
+    "grey"
+   ],
+   "trim": null
+  },
+  {
+   "file": "008-matcha-long-sleeve.png",
+   "id": "scrubs-008-matcha-long",
+   "model": "008",
+   "sleeve": "long",
+   "color": [
+    "фисташковый",
+    "pistachio"
+   ],
+   "trim": null
+  },
+  {
+   "file": "006-green-long.png",
+   "id": "scrubs-006-green-long",
+   "model": "006",
+   "sleeve": "long",
+   "color": [
+    "изумрудный",
+    "emerald"
+   ],
+   "trim": null
+  },
+  {
+   "file": "002-navy-long.png",
+   "id": "scrubs-002-navy-long",
+   "model": "002",
+   "sleeve": "long",
+   "color": [
+    "тёмно-синий",
+    "navy"
+   ],
+   "trim": null
+  },
+  {
+   "file": "004-lilac-cyan-long.png",
+   "id": "scrubs-004-lilac-cyan-long",
+   "model": "004",
+   "sleeve": "long",
+   "color": [
+    "лавандовый",
+    "lavender"
+   ],
+   "trim": [
+    "голубой",
+    "light blue"
+   ]
+  }
+ ]
+}
