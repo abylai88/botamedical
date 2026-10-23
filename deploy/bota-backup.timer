@@ -1,0 +1,12 @@
+# Резервная копия каждый день около 03:30 по времени сервера (Asia/Almaty).
+# Persistent=true: если сервер был выключен в это время, копия делается сразу после включения.
+[Unit]
+Description=BOTA: ежедневная резервная копия
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

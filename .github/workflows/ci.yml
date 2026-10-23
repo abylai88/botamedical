@@ -1,0 +1,53 @@
+# Автоматическая проверка на серверах GitHub при каждом PR и пуше в main.
+# Ничего не публикует и не деплоит: только сборка, тесты и проверка серверных скриптов.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Сборка и тесты сайта
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  deploy-scripts:
+    name: Серверные скрипты (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: sqlite3 для тестов очистки спама
+        run: command -v sqlite3 || (sudo apt-get update -q && sudo apt-get install -y -q sqlite3)
+      - name: ShellCheck
+        run: shellcheck -S warning deploy/*.sh deploy/tests/*.sh
+      - name: Тесты скриптов деплоя
+        shell: bash
+        run: |
+          set -o pipefail
+          if ! bash deploy/tests/run.sh 2>&1 | tee deploy-tests.log; then
+            # Показать упавшие проверки как аннотации, чтобы их было видно без скачивания логов.
+            grep -E 'FAIL|passed' deploy-tests.log | head -n 10 | sed 's/^ *//; s/^/::error title=deploy tests::/'
+            grep -E '^ +\|' deploy-tests.log | head -n 20 | tr '\n' ' ' | sed 's/^/::error title=deploy tests output::/'
+            echo
+            exit 1
+          fi

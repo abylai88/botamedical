@@ -1,0 +1,37 @@
+# Удаление старых резервных копий. Запускается таймером bota-backup-prune.timer независимо от бэкапа.
+# Устанавливается deploy/install.sh в /etc/systemd/system/ (см. deploy/README.md, раздел 8).
+[Unit]
+Description=BOTA: удаление резервных копий старше 30 дней
+
+[Service]
+Type=oneshot
+User=bota
+Group=bota
+Environment=BOTA_BACKUP_DIR=/var/backups/bota
+Environment=BOTA_BACKUP_KEEP=14
+Environment=BOTA_BACKUP_MAX_AGE_DAYS=30
+# Скрипт принадлежит root (устанавливает deploy/install.sh): сайт не может его подменить.
+ExecStart=/usr/local/sbin/bota-backup-prune
+Nice=10
+
+ProtectSystem=strict
+ReadWritePaths=/var/backups/bota
+PrivateNetwork=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

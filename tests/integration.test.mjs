@@ -1,14 +1,19 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
 
 process.env.BOTA_DATA_DIR = await mkdtemp(join(tmpdir(), 'bota-test-'));
+// Installation step: the order key is created by an explicit command; the site never makes one itself.
+const keyScript = () => spawnSync(process.execPath, ['scripts/order-key.mjs'], { env: process.env, encoding: 'utf8' });
+const dbVerify = () => spawnSync(process.execPath, ['--conditions=react-server', 'scripts/db-verify.mjs'], { env: process.env, encoding: 'utf8' });
+const keyCreated = keyScript(); assert.equal(keyCreated.status, 0, keyCreated.stderr); assert.match(keyCreated.stdout, /order-key created/);
 const { db, products, product, orders, orderPage, orderCounts, purgeOldSpam, encrypt, digest } = await import('../lib/db.ts');
 const { issueFormToken } = await import('../lib/form-token.ts');
 const { hashPassword, verifyPassword, session } = await import('../lib/auth.ts');
@@ -55,6 +60,9 @@ test('server flows, persistence, validation and security boundaries', async t =>
       assert.match(response.headers.get('content-security-policy'), /nonce-/);
       assert.ok(!response.headers.get('content-security-policy').includes('unsafe-eval'));
     }
+    const privacy = await (await request('/privacy')).text();
+    for (const part of ['Политика конфиденциальности', 'территории Республики Казахстан', 'WhatsApp', 'проверить у юриста']) assert.ok(privacy.includes(part), part);
+    assert.ok((await (await request('/')).text()).includes('href="/privacy"'), 'Footer links to the privacy policy');
     // Next.js keeps status 200 once a loading boundary has started streaming.
     const missing = await request('/catalog/missing');
     assert.ok([200, 404].includes(missing.status));
@@ -127,14 +135,46 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.equal((await request('/api/orders', 'POST', { ...payload, customer: { ...payload.customer, note: 'x'.repeat(40000) } })).status, 413);
     assert.equal(orderSchema.safeParse({ ...payload, total: 1 }).success, false);
   });
+  await t.test('order key is never replaced or created by the site; without it no order is taken', async () => {
+    const keyFile = join(process.env.BOTA_DATA_DIR, 'order-key'); const original = await readFile(keyFile);
+    const again = keyScript(); assert.equal(again.status, 0); assert.match(again.stdout, /already exists/); assert.deepEqual(await readFile(keyFile), original);
+    const count = () => db().prepare('SELECT count(*) AS c FROM orders').get().c; const saved = count();
+    await rename(keyFile, keyFile + '.away');
+    try {
+      const response = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: freshToken() }, from('192.0.2.150'));
+      assert.equal(response.status, 503); assert.match((await response.json()).error, /Не удалось оформить заказ/);
+      assert.equal(existsSync(keyFile), false, 'The site must not create a key by itself'); assert.equal(count(), saved);
+      assert.equal((await request('/readyz')).status, 503, 'Not ready without the order key'); assert.equal((await request('/healthz')).status, 200);
+      assert.equal(dbVerify().status, 1);
+    } finally { await rename(keyFile + '.away', keyFile); }
+  });
   await t.test('order persistence, authoritative totals, encryption and retry idempotency', async () => {
     const response = await request('/api/orders', 'POST', payload); assert.equal(response.status, 201); savedId = (await response.json()).id;
     const repeat = await request('/api/orders', 'POST', payload); assert.equal(repeat.status, 200); assert.equal((await repeat.json()).id, savedId);
     assert.equal(orders().length, 1); assert.equal(orders()[0].total, 580000); assert.equal(orders()[0].customer.name, payload.customer.name);
+    assert.equal(orders()[0].consentAt, orders()[0].createdAt, 'Consent time is saved with the order'); assert.match(orders()[0].privacyVersion, /^\d{4}-\d{2}-\d{2}$/);
     const raw = db().prepare('SELECT payload FROM orders').get().payload; assert.ok(!raw.includes(payload.customer.name)); assert.ok(!raw.includes(payload.customer.email));
     assert.equal((await request('/api/orders', 'POST', { ...payload, customer: { ...payload.customer, name: 'Другой' } })).status, 409);
     assert.ok((await (await request('/admin')).text()).includes(payload.customer.name));
     const anonymous = await fetch(base + '/admin'); assert.ok(!(await anonymous.text()).includes(payload.customer.name));
+  });
+  await t.test('readyz and db:verify catch an order key that cannot open the saved orders', async () => {
+    assert.ok(orders().length > 0, 'Needs a saved order');
+    const ready = await request('/readyz'); assert.equal(ready.status, 200); assert.deepEqual(await ready.json(), { status: 'ready' });
+    const ok = dbVerify(); assert.equal(ok.status, 0, ok.stderr); assert.match(ok.stdout, /^OK: .* 1 orders decrypted/); assert.ok(!ok.stdout.includes(payload.customer.name));
+    const keyFile = join(process.env.BOTA_DATA_DIR, 'order-key'); const original = await readFile(keyFile);
+    await writeFile(keyFile, randomBytes(32));
+    try {
+      const wrong = await request('/readyz'); assert.equal(wrong.status, 503); assert.deepEqual(await wrong.json(), { status: 'not ready' });
+      const failed = dbVerify(); assert.equal(failed.status, 1); assert.match(failed.stderr, /1 of 1 orders cannot be decrypted/); assert.ok(!failed.stderr.includes(payload.customer.name));
+    } finally { await writeFile(keyFile, original); }
+    assert.equal((await request('/readyz')).status, 200);
+    // An old damaged order (not the newest) is still caught by db:verify, which checks every order.
+    db().prepare("INSERT INTO orders (id, request_id, request_hash, created, status, payload) VALUES ('old-damaged', 'old-damaged', 'x', '2000-01-01T00:00:00.000Z', 'new', 'not-a-valid-payload')").run();
+    try {
+      const damaged = dbVerify(); assert.equal(damaged.status, 1); assert.match(damaged.stderr, /1 of 2 orders cannot be decrypted/);
+    } finally { db().prepare("DELETE FROM orders WHERE id = 'old-damaged'").run(); }
+    assert.equal(dbVerify().status, 0);
   });
   await t.test('comments under each look: public post, validation, staff badge, moderation', async () => {
     const admin = cookie; cookie = '';
@@ -220,6 +260,13 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const second = await request('/api/orders', 'POST', { ...first, requestId: randomUUID() }, from('192.0.2.85'));
     assert.equal(second.status, 400); assert.match((await second.json()).error, /Обновите страницу/);
     assert.equal(db().prepare('SELECT count(*) AS n FROM used_form_tokens WHERE hash=?').get(digest(token.split('.')[1])).n, 1, 'Marked used by its random id');
+    // A form shown under an older privacy policy edition is not accepted: the customer reloads and accepts the current one.
+    const oldPolicy = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: issueFormToken(Date.now() - 5000, '20000101') }, from('192.0.2.87'));
+    assert.equal(oldPolicy.status, 400, 'Form from an older policy edition must be reloaded'); assert.match((await oldPolicy.json()).error, /Обновите страницу/);
+    // A page rendered by the previous release (token without the policy edition) is asked to reload, not quarantined.
+    const [ms, id, , mac] = freshToken().split('.');
+    const legacy = await request('/api/orders', 'POST', { ...payload, requestId: randomUUID(), formToken: `${ms}.${id}.${mac}` }, from('192.0.2.88'));
+    assert.equal(legacy.status, 400, 'Old-format token: reload, not a fake success'); assert.match((await legacy.json()).error, /Обновите страницу/);
     // Two customers whose forms rendered in the same millisecond both get through.
     const sameMoment = Date.now() - 5000, a = issueFormToken(sameMoment), b = issueFormToken(sameMoment);
     assert.notEqual(a, b); assert.equal(a.split('.')[0], b.split('.')[0]);

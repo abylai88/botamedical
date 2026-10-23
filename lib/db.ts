@@ -1,6 +1,6 @@
 import 'server-only';
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import type { Product, Order } from './types.ts';
@@ -78,16 +78,13 @@ export function product(id: string): Product | undefined {
   const row = db().prepare('SELECT data FROM products WHERE id=?').get(id) as { data: string } | undefined;
   return row ? JSON.parse(row.data) : undefined;
 }
+// The order key is created once by `npm run key:create` during installation, never by the site itself:
+// a key made silently on the first order could be missing from the owner's safe copies.
+const orderKeyFile = () => join(dataDir, 'order-key');
+export function hasOrderKey() { return existsSync(orderKeyFile()); }
 function encryptionKey() {
-  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-  const file = join(dataDir, 'order-key');
-  if (!existsSync(file)) {
-    if ((db().prepare('SELECT count(*) AS count FROM orders').get() as { count: number }).count > 0) throw new Error('Order key missing: restore the original key from a protected backup');
-    // Exclusive creation handles two workers starting together. Never replace an existing key.
-    try { writeFileSync(file, randomBytes(32), { flag: 'wx', mode: 0o600 }); }
-    catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e; }
-  }
-  const key = readFileSync(file);
+  if (!hasOrderKey()) throw new Error('Order key missing: create it with npm run key:create or restore the original key');
+  const key = readFileSync(orderKeyFile());
   if (key.length !== 32) throw new Error('Invalid local encryption key');
   return key;
 }
@@ -103,6 +100,25 @@ function decrypt(value: string) {
   decipher.setAuthTag(bytes.subarray(12, 28));
   return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]).toString('utf8'));
 }
+// Decrypts the newest orders with the current order-key and reports only counts, never the contents.
+// Checks every order (including quarantined spam) one row at a time, so a large database is not loaded at once.
+export function verifyOrders() {
+  let checked = 0, failed = 0;
+  for (const row of db().prepare('SELECT payload FROM orders').iterate() as unknown as Iterable<{ payload: string }>) {
+    checked++;
+    try { decrypt(row.payload); } catch { failed++; }
+  }
+  return { checked, failed };
+}
+// Readiness (/readyz, bota-update, bota-restore): the database answers, the order key is present, encrypts and
+// decrypts a test value, and opens the newest order. Nothing about the data leaves this function.
+export function ready() {
+  db().prepare('SELECT 1').get();
+  if (!hasOrderKey() || decrypt(encrypt({ check: 1 })).check !== 1) return false;
+  const newest = db().prepare('SELECT payload FROM orders ORDER BY created DESC LIMIT 1').get() as { payload: string } | undefined;
+  if (newest) decrypt(newest.payload);
+  return true;
+}
 type OrderRow = { id: string; created: string; status: Order['status']; payload: string };
 const readOrder = (row: OrderRow): Order => ({ ...decrypt(row.payload), id: row.id, createdAt: row.created, status: row.status });
 export function orders(): Order[] {
@@ -113,8 +129,11 @@ export type OrderView = 'all' | 'new' | 'spam';
 // 'all' hides quarantined spam, 'new' lists every unprocessed order regardless of age, 'spam' is the quarantine.
 const VIEW_WHERE: Record<OrderView, string> = { all: "WHERE status!='spam'", new: "WHERE status='new'", spam: "WHERE status='spam'" };
 export const SPAM_KEEP_DAYS = 30;
-export function purgeOldSpam() {
-  db().prepare("DELETE FROM orders WHERE status='spam' AND created < ?").run(new Date(Date.now() - SPAM_KEEP_DAYS * 86_400_000).toISOString());
+// Called by the admin page and the orders API. On the server bota-spam-purge (deploy/spam-purge.sh) also deletes
+// old spam daily, independently of visitors; keep its BOTA_SPAM_KEEP_DAYS equal to SPAM_KEEP_DAYS.
+export function purgeOldSpam(): number {
+  const result = db().prepare("DELETE FROM orders WHERE status='spam' AND created < ?").run(new Date(Date.now() - SPAM_KEEP_DAYS * 86_400_000).toISOString());
+  return Number(result.changes);
 }
 // Pages are anchored to an order ("<created>~<id>") instead of an offset, so orders that arrive
 // or change status between page loads never cause repeats or gaps.

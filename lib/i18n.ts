@@ -3,13 +3,17 @@ export type Locale = 'ru' | 'en';
 export const LOCALES: Locale[] = ['ru', 'en'];
 export const LOCALE_COOKIE = 'bota_lang';
 export function toLocale(value?: string | null): Locale { return value === 'en' ? 'en' : 'ru'; }
+// Edition of the privacy policy. Saved with every order next to the time of consent; change it when the policy text changes.
+export const PRIVACY_VERSION = '2026-10-22';
+// A policy section; "orders" sections apply only while the site takes orders, "demo" ones only in the public showcase.
+type PrivacySection = { title: string; text: string[]; only?: 'orders' | 'demo' };
 
 const ru = {
   meta: { title: 'BOTA — медицинская одежда', description: 'Медицинские халаты и комплекты BOTA.' },
   announce: 'Форма для всего отделения — соберите заказ на команду в одной корзине',
   announceDemo: 'Онлайн-заказы на сайте временно не принимаются',
   nav: { catalog: 'Каталог', coats: 'Халаты', looks: 'Образы', about: 'О бренде', info: 'Заказ и контакты', home: 'BOTA — главная', main: 'Главная навигация', menu: 'Меню', close: 'Закрыть', cart: (n: number) => `Корзина, товаров: ${n}`, language: 'Язык сайта' },
-  footer: { infoTitle: 'О компании', infoText: 'Здесь будет информация о BOTA: адрес шоурума, телефон, график работы и реквизиты.\nЭто демонстрационный текст — замените его в панели управления, вкладка «Сайт».', contactsTitle: 'Информация', tagline: 'Медицинская одежда для тех, кто работает в движении.', nav: 'Навигация в подвале', privacy: 'Данные и конфиденциальность', admin: 'Управление магазином', note: 'Оплата на сайте не производится. Наличие, размер и сроки подтверждает магазин после оформления заказа.' },
+  footer: { infoTitle: 'О компании', infoText: 'Здесь будет информация о BOTA: адрес шоурума, телефон, график работы и реквизиты.\nЭто демонстрационный текст — замените его в панели управления, вкладка «Сайт».', contactsTitle: 'Информация', tagline: 'Медицинская одежда для тех, кто работает в движении.', nav: 'Навигация в подвале', privacy: 'Политика конфиденциальности', admin: 'Управление магазином', note: 'Оплата на сайте не производится. Наличие, размер и сроки подтверждает магазин после оформления заказа.' },
   home: {
     kicker: 'Медицинская одежда BOTA',
     title: 'Форма,\nв которой\nвас узнают.',
@@ -72,8 +76,8 @@ const ru = {
     title: 'Оформление заказа', kicker: 'Последний шаг', closedTitle: 'Пока только знакомство', closedText: 'Каталог и корзина доступны, но онлайн-заказы и контактные данные здесь пока не принимаются.', back: 'Вернуться в корзину',
     contacts: 'Контактные данные', contactsText: 'Магазин свяжется с вами, чтобы подтвердить размеры, оплату и доставку.',
     name: 'Имя *', phone: 'Телефон *', email: 'Электронная почта (необязательно)', note: 'Комментарий (размеры для команды, пожелания)',
-    consent: 'Согласен на обработку указанных данных для оформления заказа.', howStored: 'Как хранятся данные',
-    errPhone: 'Укажите номер: минимум 7 цифр, допустимы +, пробелы, скобки и дефисы.', errName: 'Укажите имя от 2 до 100 символов.', errConsent: 'Подтвердите согласие на обработку данных.', errValue: 'Проверьте значение.',
+    consent: 'Согласен на сбор и обработку персональных данных в соответствии с', policyLink: 'политикой конфиденциальности',
+    errPhone: 'Укажите номер: минимум 7 цифр, допустимы +, пробелы, скобки и дефисы.', errName: 'Укажите имя от 2 до 100 символов.', errConsent: 'Без согласия на сбор и обработку персональных данных заказ не отправить.', errValue: 'Проверьте значение.',
     network: 'Нет связи с сервером. Повторите попытку.', openCart: 'Открыть корзину', saving: 'Отправляем…', submit: 'Оформить заказ', submitNote: 'Оплата при оформлении не списывается.',
     summary: 'Состав заказа', pcs: 'шт.', deliveryNote: 'Стоимость доставки рассчитывается при подтверждении.', editCart: 'Изменить корзину',
     doneTitle: 'Заказ оформлен', doneNumber: 'Номер', doneText: 'Заказ передан в магазин. Оплата не списывалась.', doneBack: 'Вернуться в каталог',
@@ -87,13 +91,20 @@ const ru = {
     contactsTitle: 'Контакты', contacts: 'Телефон, электронная почта и социальные сети BOTA появятся в этом разделе.', cta: 'Открыть каталог',
   },
   privacy: {
-    title: 'Данные и конфиденциальность', lead: 'Как сайт BOTA обращается с вашими данными.',
-    cartTitle: 'Корзина', cart: 'В браузере сохраняются только идентификаторы товаров, выбранные варианты и количество. Имя, телефон и данные заказа в хранилище браузера не записываются. Выбранный язык хранится в cookie.',
-    ordersTitle: 'Заказы', orders: 'Имя, телефон, необязательная почта и комментарий хранятся в зашифрованном виде на сервере магазина. Доступ к ним есть только у администратора. Внешним почтовым, платёжным или аналитическим сервисам эти данные не передаются.',
-    commentsTitle: 'Отзывы', comments: 'Имя и текст отзыва показываются всем посетителям страницы товара. Почта и телефон не запрашиваются. Магазин может скрыть или удалить отзыв.',
-    sessionTitle: 'Вход администратора', session: 'Для входа используется служебный cookie, недоступный JavaScript. Сессия действует до восьми часов и прекращается при выходе.',
-    closedTitle: 'Режим витрины', closed: 'Каталог и корзина доступны без регистрации. Административная панель и приём заказов отключены. Хостинг может обрабатывать технические журналы запросов.',
-    operatorTitle: 'Оператор данных', operator: 'Сведения об операторе данных, сроках хранения и порядке обращений будут опубликованы на этой странице.',
+    title: 'Политика конфиденциальности', lead: 'Как BOTA собирает, использует и хранит персональные данные покупателей сайта.', updated: 'Редакция от 22 октября 2026 г.',
+    sections: [
+      { title: 'Кто обрабатывает данные', text: ['Оператор персональных данных: ТОО «BOTA Medical Uniform», БИН 260740016489.', 'Юридический адрес: Казахстан, г. Алматы, проспект Райымбека, 162а.', 'Контакты: WhatsApp +7 (747) 993 5769, электронная почта botagroupp@gmail.com.'] },
+      { title: 'Какие данные мы собираем', only: 'orders', text: ['При оформлении заказа: имя, номер телефона, адрес доставки (если вы указали его в комментарии или сообщили нам при подтверждении), состав заказа — товары, размеры, цвета, количество и сумма. Электронная почта и комментарий — по желанию.', 'Вместе с заказом сохраняются дата и время вашего согласия на обработку персональных данных.', 'Для защиты от спама сайт временно учитывает IP-адрес отправителя в обезличенном виде. Он не сохраняется в заказе и удаляется автоматически.'] },
+      { title: 'Зачем мы их используем', only: 'orders', text: ['Чтобы выполнить заказ: подтвердить наличие и размер, договориться об оплате и доставке.', 'Чтобы связаться с вами по этому заказу — по телефону, в WhatsApp или по электронной почте.', 'Мы не делаем рекламных рассылок по этим данным, не продаём их и не передаём третьим лицам, кроме службы доставки (только то, что нужно для доставки) и случаев, прямо предусмотренных законодательством Республики Казахстан.'] },
+      { title: 'Где хранятся данные', only: 'orders', text: ['Данные хранятся на сервере, расположенном на территории Республики Казахстан.', 'Контакты в заказах хранятся в зашифрованном виде, доступ к ним есть только у администратора магазина. Резервные копии тоже зашифрованы и хранятся в Казахстане.', 'Внешним почтовым, платёжным и аналитическим сервисам данные не передаются.'] },
+      { title: 'Сколько хранятся данные', only: 'orders', text: ['Данные заказа хранятся в течение срока, необходимого для выполнения заказа и соблюдения требований налогового и бухгалтерского законодательства Республики Казахстан, после чего удаляются.', 'Вы можете попросить удалить ваши данные раньше, если это не противоречит закону.', 'Заказы, которые система приняла за спам, удаляются автоматически через 30 дней.', 'Зашифрованные резервные копии хранятся не дольше 30 дней.'] },
+      { title: 'Как узнать, исправить или удалить свои данные', only: 'orders', text: ['Вы можете узнать, какие ваши данные мы храним, исправить их, отозвать согласие или попросить удалить их.', 'Напишите нам в WhatsApp: +7 (747) 993 5769. Укажите имя и номер телефона, с которого оформляли заказ.', 'Мы удалим данные из базы сайта; из резервных копий они исчезнут в течение 30 дней. Сведения, которые закон обязывает хранить (например, для налогового и бухгалтерского учёта), удаляются по окончании установленного законом срока.'] },
+      { title: 'Корзина и cookie', text: ['Корзина хранится только в вашем браузере: идентификаторы товаров, выбранные варианты и количество. Имя, телефон и данные заказа туда не записываются.', 'Cookie используются только для выбранного языка и для входа администратора магазина (служебный cookie, недоступный JavaScript, действует до восьми часов). Рекламных и аналитических cookie нет.'] },
+      { title: 'Отзывы', only: 'orders', text: ['Имя и текст отзыва видны всем посетителям страницы товара. Почта и телефон не запрашиваются. Магазин может скрыть или удалить отзыв, в том числе по вашей просьбе.'] },
+      { title: 'Режим витрины', only: 'demo', text: ['Каталог и корзина доступны без регистрации. Административная панель и приём заказов отключены, персональные данные на сайте не собираются. Хостинг может обрабатывать технические журналы запросов.'] },
+      { title: 'Изменения политики', text: ['Мы можем обновлять эту политику. Действующая редакция всегда опубликована на этой странице, дата редакции указана вверху.'] },
+    ] as PrivacySection[],
+    legal: 'Черновик: текст нужно проверить у юриста перед началом приёма заказов.',
   },
   notFound: { title: 'Страница не найдена', text: 'Возможно, товар был удалён или адрес изменился.', cta: 'Открыть каталог' },
   error: { title: 'Не удалось загрузить страницу', text: 'Попробуйте ещё раз через несколько секунд.', retry: 'Повторить' },
@@ -106,7 +117,7 @@ const en: Dictionary = {
   announce: 'Uniforms for the whole department — build your team order in one cart',
   announceDemo: 'Online orders are temporarily unavailable',
   nav: { catalog: 'Shop', coats: 'Lab coats', looks: 'Looks', about: 'About', info: 'Ordering & contact', home: 'BOTA — home', main: 'Main navigation', menu: 'Menu', close: 'Close', cart: (n: number) => `Cart, items: ${n}`, language: 'Site language' },
-  footer: { infoTitle: 'About the company', infoText: 'Information about BOTA will appear here: showroom address, phone, opening hours and company details.\nThis is placeholder text — replace it in the admin panel, “Site” tab.', contactsTitle: 'Information', tagline: 'Medical apparel for people who work on the move.', nav: 'Footer navigation', privacy: 'Data & privacy', admin: 'Store admin', note: 'No payment is taken on the site. The store confirms availability, size and timing after you place an order.' },
+  footer: { infoTitle: 'About the company', infoText: 'Information about BOTA will appear here: showroom address, phone, opening hours and company details.\nThis is placeholder text — replace it in the admin panel, “Site” tab.', contactsTitle: 'Information', tagline: 'Medical apparel for people who work on the move.', nav: 'Footer navigation', privacy: 'Privacy policy', admin: 'Store admin', note: 'No payment is taken on the site. The store confirms availability, size and timing after you place an order.' },
   home: {
     kicker: 'BOTA medical apparel',
     title: 'The uniform\nthey know you by.',
@@ -169,8 +180,8 @@ const en: Dictionary = {
     title: 'Checkout', kicker: 'Final step', closedTitle: 'Just browsing for now', closedText: 'The shop and cart are available, but online orders and contact details are not accepted here yet.', back: 'Back to cart',
     contacts: 'Contact details', contactsText: 'The store will contact you to confirm sizes, payment and delivery.',
     name: 'Name *', phone: 'Phone *', email: 'Email (optional)', note: 'Comment (team sizes, requests)',
-    consent: 'I agree to the processing of these details to place my order.', howStored: 'How data is stored',
-    errPhone: 'Enter a number with at least 7 digits; +, spaces, brackets and hyphens are allowed.', errName: 'Enter a name of 2 to 100 characters.', errConsent: 'Please confirm your consent to data processing.', errValue: 'Please check this value.',
+    consent: 'I agree to the collection and processing of my personal data under the', policyLink: 'privacy policy',
+    errPhone: 'Enter a number with at least 7 digits; +, spaces, brackets and hyphens are allowed.', errName: 'Enter a name of 2 to 100 characters.', errConsent: 'We cannot send the order without your consent to the collection and processing of personal data.', errValue: 'Please check this value.',
     network: 'No connection to the server. Please try again.', openCart: 'Open cart', saving: 'Sending…', submit: 'Place order', submitNote: 'No payment is charged when you place the order.',
     summary: 'Order summary', pcs: 'pcs', deliveryNote: 'Delivery cost is calculated on confirmation.', editCart: 'Edit cart',
     doneTitle: 'Order placed', doneNumber: 'Number', doneText: 'Your order has been sent to the store. No payment was taken.', doneBack: 'Back to shop',
@@ -184,13 +195,20 @@ const en: Dictionary = {
     contactsTitle: 'Contact', contacts: 'BOTA phone, email and social media will appear in this section.', cta: 'Go to shop',
   },
   privacy: {
-    title: 'Data & privacy', lead: 'How the BOTA website handles your data.',
-    cartTitle: 'Cart', cart: 'Your browser stores only product IDs, selected options and quantities. Your name, phone and order details are never written to browser storage. Your language choice is kept in a cookie.',
-    ordersTitle: 'Orders', orders: 'Name, phone, optional email and comment are stored encrypted on the store’s server and are accessible only to the administrator. They are not shared with external email, payment or analytics services.',
-    commentsTitle: 'Reviews', comments: 'Your name and review text are shown to all visitors of the product page. Email and phone are never requested. The store may hide or delete a review.',
-    sessionTitle: 'Admin sign-in', session: 'Sign-in uses an HTTP-only cookie that JavaScript cannot read. A session lasts up to eight hours and ends when you sign out.',
-    closedTitle: 'Showcase mode', closed: 'The shop and cart work without registration. The admin panel and order intake are disabled. The host may process technical request logs.',
-    operatorTitle: 'Data controller', operator: 'Details about the data controller, retention periods and how to make requests will be published on this page.',
+    title: 'Privacy policy', lead: 'How BOTA collects, uses and stores the personal data of website customers.', updated: 'Version of 22 October 2026',
+    sections: [
+      { title: 'Who processes the data', text: ['Data controller: BOTA Medical Uniform LLP, BIN 260740016489.', 'Registered address: 162a Raiymbek Ave, Almaty, Kazakhstan.', 'Contact: WhatsApp +7 (747) 993 5769, email botagroupp@gmail.com.'] },
+      { title: 'What data we collect', only: 'orders', text: ['When you place an order: your name, phone number, delivery address (if you put it in the comment or tell us when we confirm the order) and the order itself — products, sizes, colours, quantities and total. Email and comment are optional.', 'The date and time of your consent to personal data processing are saved with the order.', 'To protect against spam, the site briefly counts the sender’s IP address in anonymised form. It is not saved with the order and is deleted automatically.'] },
+      { title: 'Why we use it', only: 'orders', text: ['To fulfil your order: confirm availability and size, and agree on payment and delivery.', 'To contact you about this order — by phone, WhatsApp or email.', 'We do not send advertising using this data, do not sell it and do not share it with third parties, except the delivery service (only what delivery needs) and cases expressly required by the laws of the Republic of Kazakhstan.'] },
+      { title: 'Where the data is stored', only: 'orders', text: ['The data is stored on a server located in the Republic of Kazakhstan.', 'Contact details in orders are stored encrypted and only the store administrator can access them. Backups are encrypted too and kept in Kazakhstan.', 'The data is not shared with external email, payment or analytics services.'] },
+      { title: 'How long we keep it', only: 'orders', text: ['Order data is kept for as long as needed to fulfil the order and to meet the tax and accounting requirements of the Republic of Kazakhstan, and is then deleted.', 'You can ask us to delete your data sooner, unless this conflicts with the law.', 'Orders the system flagged as spam are deleted automatically after 30 days.', 'Encrypted backups are kept for no longer than 30 days.'] },
+      { title: 'How to access, correct or delete your data', only: 'orders', text: ['You can ask what data we hold about you, correct it, withdraw your consent or ask us to delete it.', 'Message us on WhatsApp: +7 (747) 993 5769. Include your name and the phone number you used for the order.', 'We will delete the data from the site database; it disappears from backups within 30 days. Records the law requires us to keep (for example, for tax and accounting) are deleted when the legally required period ends.'] },
+      { title: 'Cart and cookies', text: ['Your cart is stored only in your browser: product IDs, selected options and quantities. Your name, phone and order details are never written there.', 'Cookies are used only for your language choice and for the store administrator’s sign-in (an HTTP-only cookie that lasts up to eight hours). There are no advertising or analytics cookies.'] },
+      { title: 'Reviews', only: 'orders', text: ['Your name and review text are visible to everyone on the product page. Email and phone are never requested. The store may hide or delete a review, including at your request.'] },
+      { title: 'Showcase mode', only: 'demo', text: ['The shop and cart work without registration. The admin panel and order intake are disabled, and no personal data is collected on the site. The host may process technical request logs.'] },
+      { title: 'Changes to this policy', text: ['We may update this policy. The current version is always published on this page, with its date shown at the top.'] },
+    ] as PrivacySection[],
+    legal: 'Draft: this text must be reviewed by a lawyer before the site starts taking orders.',
   },
   notFound: { title: 'Page not found', text: 'The product may have been removed or the address has changed.', cta: 'Go to shop' },
   error: { title: 'The page could not be loaded', text: 'Please try again in a few seconds.', retry: 'Try again' },

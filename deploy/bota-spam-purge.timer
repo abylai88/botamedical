@@ -1,0 +1,12 @@
+# Очистка спам-заказов каждый день около 04:30, независимо от посещений сайта и админки.
+# Persistent=true: если сервер был выключен в это время, очистка запускается сразу после включения.
+[Unit]
+Description=BOTA: ежедневное удаление старых спам-заказов
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

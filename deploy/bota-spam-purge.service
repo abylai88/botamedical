@@ -1,0 +1,37 @@
+# Удаление спам-заказов старше 30 дней, как обещает политика конфиденциальности — даже если админку никто
+# не открывает. Запускается таймером bota-spam-purge.timer. Устанавливается deploy/install.sh в /etc/systemd/system/.
+[Unit]
+Description=BOTA: удаление спам-заказов старше 30 дней
+
+[Service]
+Type=oneshot
+User=bota
+Group=bota
+Environment=BOTA_DATA_DIR=/var/lib/bota/data
+Environment=BOTA_SPAM_KEEP_DAYS=30
+# Скрипт принадлежит root и лежит вне релизов сайта: откат версии его не затрагивает, сайт не может его подменить.
+ExecStart=/usr/local/sbin/bota-spam-purge
+Nice=10
+UMask=0077
+
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bota
+PrivateNetwork=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

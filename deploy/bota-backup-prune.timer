@@ -1,0 +1,12 @@
+# Очистка старых копий каждый день около 05:00 — отдельно от бэкапа, чтобы работать даже когда бэкап падает.
+# Persistent=true: если сервер был выключен в это время, очистка запускается сразу после включения.
+[Unit]
+Description=BOTA: ежедневная очистка старых резервных копий
+
+[Timer]
+OnCalendar=*-*-* 05:00:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
