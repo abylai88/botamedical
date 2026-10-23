@@ -38,7 +38,9 @@ const ru = {
   },
   card: { open: (name: string) => `Открыть ${name}`, quick: 'Подробнее', sizes: (s: string) => `Размеры: ${s}`, sizesSoon: 'Размеры уточняются' },
   catalog: {
-    title: 'Каталог', heading: 'Медицинская одежда', lead: 'Халаты и хирургические костюмы BOTA.', home: 'Главная',
+    title: 'Каталог', heading: 'Медицинская одежда', lead: 'Халаты и хирургические костюмы BOTA.',
+    // Subtitle of a filtered catalog page, by stored (Russian) category name; other categories use `lead`.
+    categoryLeads: { 'Халаты': 'Медицинские халаты BOTA.', 'Хирургические костюмы': 'Рубашка и брюки: короткий или длинный рукав, размеры XS–4XL.' } as Record<string, string>, home: 'Главная',
     search: 'Поиск', searchPlaceholder: 'Название модели…', category: 'Категория', allCategories: 'Все категории',
     sort: 'Порядок', sortDefault: 'По умолчанию', sortAsc: 'Сначала дешевле', sortDesc: 'Сначала дороже', apply: 'Показать',
     found: (n: number) => `Найдено моделей: ${n}`, reset: 'Сбросить фильтры',
@@ -142,7 +144,8 @@ const en: Dictionary = {
   },
   card: { open: (name: string) => `Open ${name}`, quick: 'View', sizes: (s: string) => `Sizes: ${s}`, sizesSoon: 'Sizes to be confirmed' },
   catalog: {
-    title: 'Shop', heading: 'Medical apparel', lead: 'BOTA lab coats and surgical scrubs.', home: 'Home',
+    title: 'Shop', heading: 'Medical apparel', lead: 'BOTA lab coats and surgical scrubs.',
+    categoryLeads: { 'Халаты': 'BOTA medical lab coats.', 'Хирургические костюмы': 'Top and trousers: short or long sleeves, sizes XS–4XL.' }, home: 'Home',
     search: 'Search', searchPlaceholder: 'Style name…', category: 'Category', allCategories: 'All categories',
     sort: 'Sort', sortDefault: 'Featured', sortAsc: 'Price: low to high', sortDesc: 'Price: high to low', apply: 'Apply',
     found: (n: number) => `Styles found: ${n}`, reset: 'Clear filters',

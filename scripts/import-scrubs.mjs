@@ -76,8 +76,14 @@ async function readCopy() {
   } else copyFileSync(dbFile, copy);
   return new DatabaseSync(copy, { readOnly: true });
 }
-process.on('exit', () => { if (scratch) rmSync(scratch, { recursive: true, force: true }); });
 const database = apply ? db() : existsSync(dbFile) ? await readCopy() : null;
+// The snapshot holds the shop's data: close it first (Windows cannot delete an open file), then remove it.
+process.on('exit', () => {
+  if (!scratch) return;
+  try { database?.close(); } catch {}
+  try { rmSync(scratch, { recursive: true, force: true, maxRetries: 5 }); }
+  catch { console.error(`Remove the temporary copy of the database by hand: ${scratch}`); process.exitCode = 1; }
+});
 if (!database) console.log(`No database yet in ${dataDir}: it is created on --apply.`);
 const productRows = () => database ? database.prepare('SELECT data FROM products').all().map(r => JSON.parse(r.data)) : [];
 const exists = id => Boolean(database?.prepare('SELECT 1 FROM products WHERE id=?').get(id));
