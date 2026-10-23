@@ -6,3 +6,5 @@ export function appOrigin(env = process.env) {
   return url.origin;
 }
 export function publicDemo(env = process.env) { return env.BOTA_PUBLIC_DEMO === '1'; }
+// Search engines may index only the real shop: HTTPS origin and not the demo. Local runs and demos stay noindex.
+export function indexable(env = process.env) { return !publicDemo(env) && appOrigin(env).startsWith('https://'); }

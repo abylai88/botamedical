@@ -5,7 +5,7 @@ import { COOKIE, session } from '@/lib/auth';
 import { CartProvider } from '@/components/cart-provider';
 import { Header } from '@/components/header';
 import { LocaleProvider } from '@/components/locale-provider';
-import { publicDemo } from '@/lib/deployment';
+import { appOrigin, indexable, publicDemo } from '@/lib/deployment';
 import { getDictionary } from '@/lib/locale';
 import { siteTexts } from '@/lib/site';
 import { SCRUBS_CATEGORY, categoryHref } from '@/lib/categories';
@@ -14,7 +14,13 @@ import './editorial.css';
 export const dynamic = 'force-dynamic';
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getDictionary();
-  return { title: { default: t.meta.title, template: '%s — BOTA' }, description: t.meta.description, robots: { index: false, follow: false } };
+  const index = indexable();
+  return {
+    metadataBase: new URL(appOrigin()), title: { default: t.meta.title, template: '%s — BOTA' }, description: t.meta.description,
+    robots: { index, follow: index },
+    // Link previews in WhatsApp, Instagram and Telegram.
+    openGraph: { type: 'website', siteName: 'BOTA Medical Uniform', title: t.meta.title, description: t.meta.description, images: ['/images/coat.webp'] },
+  };
 }
 export default async function Layout({ children }: { children: React.ReactNode }) {
   const { locale, t } = await getDictionary(); const demo = publicDemo(); const text = siteTexts(locale);

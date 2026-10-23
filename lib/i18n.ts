@@ -13,7 +13,7 @@ const ru = {
   announce: 'Форма для всего отделения — соберите заказ на команду в одной корзине',
   announceDemo: 'Онлайн-заказы на сайте временно не принимаются',
   nav: { catalog: 'Каталог', coats: 'Халаты', looks: 'Хирургические костюмы', about: 'О бренде', info: 'Заказ и контакты', home: 'BOTA — главная', main: 'Главная навигация', menu: 'Меню', close: 'Закрыть', cart: (n: number) => `Корзина, товаров: ${n}`, language: 'Язык сайта' },
-  footer: { infoTitle: 'О компании', infoText: 'Здесь будет информация о BOTA: адрес шоурума, телефон, график работы и реквизиты.\nЭто демонстрационный текст — замените его в панели управления, вкладка «Сайт».', contactsTitle: 'Информация', tagline: 'Медицинская одежда для тех, кто работает в движении.', nav: 'Навигация в подвале', privacy: 'Политика конфиденциальности', admin: 'Управление магазином', note: 'Оплата на сайте не производится. Наличие, размер и сроки подтверждает магазин после оформления заказа.' },
+  footer: { infoTitle: 'О компании', infoText: 'BOTA Medical Uniform — медицинская одежда из Алматы.\nАлматы, проспект Райымбека, 162а\nWhatsApp: +7 (747) 993 57 69 · botagroupp@gmail.com', contactsTitle: 'Информация', tagline: 'Медицинская одежда для тех, кто работает в движении.', nav: 'Навигация в подвале', privacy: 'Политика конфиденциальности', admin: 'Управление магазином', note: 'Оплата на сайте не производится. Наличие, размер и сроки подтверждает магазин после оформления заказа.' },
   home: {
     kicker: 'Медицинская одежда BOTA',
     title: 'Форма,\nв которой\nвас узнают.',
@@ -90,7 +90,7 @@ const ru = {
     howTitle: 'Как оформить заказ', how: 'Выберите модель, добавьте её в корзину и заполните контактные данные. Магазин получит заказ и свяжется с вами для подтверждения.', howClosed: 'Выберите модель и добавьте её в корзину. Приём заказов и контактных данных на сайте пока отключён.',
     payTitle: 'Оплата и доставка', pay: 'Оплата на сайте не производится. Способ оплаты, доставка, сроки и условия возврата согласуются при подтверждении заказа.',
     teamTitle: 'Заказ для команды', team: 'Добавьте до 20 единиц каждой модели и перечислите размеры сотрудников в комментарии к заказу.',
-    contactsTitle: 'Контакты', contacts: 'Телефон, электронная почта и социальные сети BOTA появятся в этом разделе.', cta: 'Открыть каталог',
+    contactsTitle: 'Контакты', contacts: 'WhatsApp: +7 (747) 993 57 69 · Email: botagroupp@gmail.com · Алматы, проспект Райымбека, 162а.', cta: 'Открыть каталог',
   },
   privacy: {
     title: 'Политика конфиденциальности', lead: 'Как BOTA собирает, использует и хранит персональные данные покупателей сайта.', updated: 'Редакция от 22 октября 2026 г.',
@@ -119,7 +119,7 @@ const en: Dictionary = {
   announce: 'Uniforms for the whole department — build your team order in one cart',
   announceDemo: 'Online orders are temporarily unavailable',
   nav: { catalog: 'Shop', coats: 'Lab coats', looks: 'Surgical scrubs', about: 'About', info: 'Ordering & contact', home: 'BOTA — home', main: 'Main navigation', menu: 'Menu', close: 'Close', cart: (n: number) => `Cart, items: ${n}`, language: 'Site language' },
-  footer: { infoTitle: 'About the company', infoText: 'Information about BOTA will appear here: showroom address, phone, opening hours and company details.\nThis is placeholder text — replace it in the admin panel, “Site” tab.', contactsTitle: 'Information', tagline: 'Medical apparel for people who work on the move.', nav: 'Footer navigation', privacy: 'Privacy policy', admin: 'Store admin', note: 'No payment is taken on the site. The store confirms availability, size and timing after you place an order.' },
+  footer: { infoTitle: 'About the company', infoText: 'BOTA Medical Uniform — medical apparel from Almaty.\n162a Raiymbek Ave, Almaty\nWhatsApp: +7 (747) 993 57 69 · botagroupp@gmail.com', contactsTitle: 'Information', tagline: 'Medical apparel for people who work on the move.', nav: 'Footer navigation', privacy: 'Privacy policy', admin: 'Store admin', note: 'No payment is taken on the site. The store confirms availability, size and timing after you place an order.' },
   home: {
     kicker: 'BOTA medical apparel',
     title: 'The uniform\nthey know you by.',
@@ -195,7 +195,7 @@ const en: Dictionary = {
     howTitle: 'How to order', how: 'Choose a style, add it to the cart and fill in your contact details. The store receives the order and contacts you to confirm it.', howClosed: 'Choose a style and add it to the cart. Orders and contact details are not accepted on the site yet.',
     payTitle: 'Payment & delivery', pay: 'No payment is taken on the site. Payment method, delivery, timing and returns are agreed when the order is confirmed.',
     teamTitle: 'Team orders', team: 'Add up to 20 units of each style and list your team’s sizes in the order comment.',
-    contactsTitle: 'Contact', contacts: 'BOTA phone, email and social media will appear in this section.', cta: 'Go to shop',
+    contactsTitle: 'Contact', contacts: 'WhatsApp: +7 (747) 993 57 69 · Email: botagroupp@gmail.com · 162a Raiymbek Ave, Almaty.', cta: 'Go to shop',
   },
   privacy: {
     title: 'Privacy policy', lead: 'How BOTA collects, uses and stores the personal data of website customers.', updated: 'Version of 22 October 2026',

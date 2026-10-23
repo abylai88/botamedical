@@ -63,6 +63,14 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const privacy = await (await request('/privacy')).text();
     for (const part of ['Политика конфиденциальности', 'территории Республики Казахстан', 'WhatsApp', 'проверить у юриста']) assert.ok(privacy.includes(part), part);
     assert.ok((await (await request('/')).text()).includes('href="/privacy"'), 'Footer links to the privacy policy');
+    // Local/test runs are not indexable: noindex everywhere, robots.txt closes the site, sitemap is empty.
+    assert.match(await (await request('/')).text(), /<meta name="robots" content="noindex, nofollow"/);
+    assert.match(await (await request('/robots.txt')).text(), /Disallow: \//);
+    assert.ok(!(await (await request('/sitemap.xml')).text()).includes('<url>'));
+    // Real contacts by default and a link preview for products.
+    assert.ok((await (await request('/info')).text()).includes('993 57 69'));
+    const coatPage = await (await request('/catalog/bota-coat')).text();
+    assert.match(coatPage, /<meta property="og:title" content="[^"]+"/); assert.match(coatPage, /<meta property="og:image" content="[^"]+"/);
     // A category page has its own subtitle, and the menu marks that category instead of "Каталог".
     const scrubs = await (await request('/catalog?category=' + encodeURIComponent('Хирургические костюмы'))).text();
     assert.ok(scrubs.includes('короткий или длинный рукав'), 'Scrubs subtitle');

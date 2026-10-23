@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { db, product } from './db.ts';
+import { COMPANY_WHATSAPP_DIGITS } from './company.ts';
 import { LOCALES, type Locale } from './i18n.ts';
 import { SITE_IMAGE_KEYS, SITE_TEXT_FIELDS, defaultText, emptySiteContent, siteText, type SiteContent, type SiteImageKey, type SiteTextKey } from './site-fields.ts';
 
@@ -34,7 +35,8 @@ export function saveSiteContent(input: z.infer<typeof siteSchema>) {
 
 // wa.me link for the WhatsApp number from the "Сайт" tab, or null when none is set.
 export function whatsappLink(content = getSiteContent()) {
-  const digits = (content.texts.ru['contact.whatsapp'] || content.texts.en['contact.whatsapp'] || '').replace(/\D/g, '');
+  // The number from the "Сайт" tab, otherwise the company number.
+  const digits = (content.texts.ru['contact.whatsapp'] || content.texts.en['contact.whatsapp'] || COMPANY_WHATSAPP_DIGITS).replace(/\D/g, '');
   return digits.length >= 10 && digits.length <= 15 ? `https://wa.me/${digits}` : null;
 }
 export function siteTexts(locale: Locale, content = getSiteContent()) {
