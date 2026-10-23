@@ -3,14 +3,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
 
-test('import:scrubs creates products from photos, hides the old category and is safe to repeat', async () => {
+test('import:scrubs creates products from photos, hides the old category and is safe to repeat', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'bota-import-')); const data = join(root, 'data'); const photos = join(root, 'photos');
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  // The script's temporary snapshot goes here, so the test can check nothing is left behind.
+  const scratchTmp = join(root, 'tmp'); mkdirSync(scratchTmp); const tmpEnv = { TMPDIR: scratchTmp, TMP: scratchTmp, TEMP: scratchTmp };
   mkdirSync(photos);
   for (const [file, color] of [['a-short.png', '#2a4d8f'], ['b-long.png', '#b8d8a0']]) {
     writeFileSync(join(photos, file), await sharp({ create: { width: 300, height: 400, channels: 3, background: color } }).png().toBuffer());
@@ -24,7 +27,7 @@ test('import:scrubs creates products from photos, hides the old category and is 
       { file: 'b-long.png', id: 'scrubs-test-b', model: '006', sleeve: 'long', color: ['фисташковый', 'pistachio'], trim: null },
     ],
   }));
-  const run = (...extra) => spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest, ...extra], { env: { ...process.env, BOTA_DATA_DIR: data }, encoding: 'utf8' });
+  const run = (...extra) => spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest, ...extra], { env: { ...process.env, ...tmpEnv, BOTA_DATA_DIR: data }, encoding: 'utf8' });
   const rows = () => { const d = new DatabaseSync(join(data, 'bota.sqlite')); try { return d.prepare('SELECT id, data FROM products ORDER BY rowid').all().map(r => JSON.parse(r.data)); } finally { d.close(); } };
 
   const fresh = run(); assert.equal(fresh.status, 0, fresh.stderr); assert.match(fresh.stdout, /Create: 2/);
@@ -36,6 +39,7 @@ test('import:scrubs creates products from photos, hides the old category and is 
   const dry = run(); assert.equal(dry.status, 0, dry.stderr); assert.match(dry.stdout, /Create: 2, already exist: 0, hide "Образы": 3/); assert.match(dry.stdout, /Dry run/);
   assert.ok(readFileSync(join(data, 'bota.sqlite')).equals(before), 'Dry run writes nothing'); assert.deepEqual(readdirSync(data).sort(), filesBefore, 'No new files (-wal/-shm) either');
   assert.match(dry.stdout, /Photos checked: 2/);
+  assert.deepEqual(readdirSync(scratchTmp), [], 'The temporary copy of the database is removed');
   assert.ok(!rows().some(p => p.id.startsWith('scrubs-')));
 
   const noDb = spawnSync(process.execPath, ['--conditions=react-server', 'scripts/import-scrubs.mjs', photos, '--manifest', manifest, '--apply'], { env: { ...process.env, BOTA_DATA_DIR: join(root, 'nowhere') }, encoding: 'utf8' });

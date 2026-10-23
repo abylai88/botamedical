@@ -63,6 +63,10 @@ test('server flows, persistence, validation and security boundaries', async t =>
     const privacy = await (await request('/privacy')).text();
     for (const part of ['Политика конфиденциальности', 'территории Республики Казахстан', 'WhatsApp', 'проверить у юриста']) assert.ok(privacy.includes(part), part);
     assert.ok((await (await request('/')).text()).includes('href="/privacy"'), 'Footer links to the privacy policy');
+    // A category page has its own subtitle, and the menu marks that category instead of "Каталог".
+    const scrubs = await (await request('/catalog?category=' + encodeURIComponent('Хирургические костюмы'))).text();
+    assert.ok(scrubs.includes('короткий или длинный рукав'), 'Scrubs subtitle');
+    assert.match(scrubs, /aria-current="page"[^>]*>Хирургические костюмы<|href="\/catalog\?category=%D0%A5[^"]*"[^>]*aria-current="page"/, 'Menu marks the scrubs category');
     // Next.js keeps status 200 once a loading boundary has started streaming.
     const missing = await request('/catalog/missing');
     assert.ok([200, 404].includes(missing.status));
