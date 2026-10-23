@@ -6,13 +6,20 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
-import { appOrigin } from '../lib/deployment.ts';
+import { appOrigin, indexable } from '../lib/deployment.ts';
 
 test('trusted origin uses deployment configuration and rejects unsafe origins', () => {
   assert.equal(appOrigin({}), 'http://127.0.0.1:3000');
   assert.equal(appOrigin({ RENDER_EXTERNAL_URL: 'https://botamedical.onrender.com' }), 'https://botamedical.onrender.com');
   assert.equal(appOrigin({ APP_ORIGIN: 'https://custom.example', RENDER_EXTERNAL_URL: 'https://other.example' }), 'https://custom.example');
   for (const value of ['http://public.example', 'https://user:password@example.com', 'https://example.com/path', 'javascript:alert(1)', 'https://example.com/?secret=value']) assert.throws(() => appOrigin({ APP_ORIGIN: value }));
+});
+
+test('only the real HTTPS shop is indexable by search engines', () => {
+  assert.equal(indexable({}), false, 'Local run');
+  assert.equal(indexable({ APP_ORIGIN: 'https://bota.kz' }), true, 'Real shop');
+  assert.equal(indexable({ APP_ORIGIN: 'https://bota.kz', BOTA_PUBLIC_DEMO: '1' }), false, 'Demo');
+  assert.equal(indexable({ APP_ORIGIN: 'https://203-0-113-5.sslip.io' }), false, 'Temporary address');
 });
 
 test('public demo works behind an HTTPS host and never accepts private writes', async () => {

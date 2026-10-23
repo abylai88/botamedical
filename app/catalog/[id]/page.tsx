@@ -8,7 +8,10 @@ import { ProductPurchase } from '@/components/product-purchase';
 import { ProductComments } from '@/components/product-comments';
 import { productComments } from '@/lib/comments';
 import { publicDemo } from '@/lib/deployment';
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) { const { locale, t } = await getDictionary(); const p = product((await params).id); return { title: p?.active ? localized(p, locale).name : t.product.notFound }; }
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) { const { locale, t } = await getDictionary(); const p = product((await params).id); if (!p?.active) return { title: t.product.notFound };
+  // Preview for links shared in WhatsApp/Instagram: name, first paragraph of the description and the main photo.
+  const item = localized(p, locale); const description = item.description.split('\n')[0].slice(0, 200);
+  return { title: item.name, description, openGraph: { title: item.name, description, images: p.images.slice(0, 1) } }; }
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const p = product((await params).id); if (!p || !p.active) notFound();
   const { locale, t } = await getDictionary(); const d = t.product; const { name, description, category } = localized(p, locale);
