@@ -19,6 +19,7 @@ test('only the real HTTPS shop is indexable by search engines', () => {
   assert.equal(indexable({}), false, 'Local run');
   assert.equal(indexable({ APP_ORIGIN: 'https://bota.kz' }), true, 'Real shop');
   assert.equal(indexable({ APP_ORIGIN: 'https://bota.kz', BOTA_PUBLIC_DEMO: '1' }), false, 'Demo');
+  assert.equal(indexable({ APP_ORIGIN: 'https://203-0-113-5.sslip.io' }), false, 'Temporary address');
 });
 
 test('public demo works behind an HTTPS host and never accepts private writes', async () => {

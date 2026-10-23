@@ -7,4 +7,8 @@ export function appOrigin(env = process.env) {
 }
 export function publicDemo(env = process.env) { return env.BOTA_PUBLIC_DEMO === '1'; }
 // Search engines may index only the real shop: HTTPS origin and not the demo. Local runs and demos stay noindex.
-export function indexable(env = process.env) { return !publicDemo(env) && appOrigin(env).startsWith('https://'); }
+// Temporary addresses like 203-0-113-5.sslip.io (used until the real domain works) are not indexed either.
+export function indexable(env = process.env) {
+  const origin = new URL(appOrigin(env));
+  return !publicDemo(env) && origin.protocol === 'https:' && !/(^|\.)(sslip\.io|nip\.io)$/.test(origin.hostname);
+}
