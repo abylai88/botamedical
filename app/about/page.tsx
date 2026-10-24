@@ -5,7 +5,7 @@ import { getLocale } from '@/lib/locale';
 import { ABOUT, ABOUT_LANGS, ABOUT_LANG_NAMES, ABOUT_PHOTOS, toAboutLang, type AboutPhoto } from '@/lib/about';
 import { COATS_CATEGORY, SCRUBS_CATEGORY, categoryHref } from '@/lib/categories';
 import { COMPANY } from '@/lib/company';
-import { whatsappLink } from '@/lib/site';
+import { getSiteContent, whatsappLink } from '@/lib/site';
 import '../about.css';
 
 type Props = { searchParams: Promise<{ lang?: string | string[] }> };
@@ -32,7 +32,10 @@ function Photo({ name, alt, sizes, className, priority }: { name: AboutPhoto; al
 }
 
 export default async function About({ searchParams }: Props) {
-  const lang = await language(searchParams); const c = ABOUT[lang]; const wa = whatsappLink();
+  const lang = await language(searchParams); const c = ABOUT[lang];
+  // The same number as the WhatsApp button: the one from the "Сайт" tab, otherwise the company number.
+  const content = getSiteContent(); const wa = whatsappLink(content);
+  const phone = (content.texts.ru['contact.whatsapp'] || content.texts.en['contact.whatsapp'] || COMPANY.whatsapp).trim();
   return <div className="about" lang={lang}>
     <section className="about-hero" aria-labelledby="about-title">
       <nav className="about-langs" aria-label={c.switchLabel}>
@@ -143,7 +146,7 @@ export default async function About({ searchParams }: Props) {
         <Link href="/catalog" className="button light">{c.contact.catalog}</Link>
         {wa ? <a href={wa} className="button contact-wa" target="_blank" rel="noopener noreferrer">{c.contact.whatsapp}</a> : null}
       </div>
-      <address><span>{COMPANY.whatsapp}</span><a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a><span>{c.contact.address}</span></address>
+      <address><span>{phone}</span><a href={`mailto:${COMPANY.email}`}>{COMPANY.email}</a><span>{c.contact.address}</span></address>
     </section>
   </div>;
 }
