@@ -33,13 +33,13 @@ function describe(item) {
   const sizes = `${manifest.sizes[0]}–${manifest.sizes.at(-1)}`;
   const ru = [
     `${fill(modelRu, trimRu)} Брюки на эластичном поясе. ${sleeveText[item.sleeve][0]}`,
-    `Цвет: ${colorRu}. Ткань: 65% полиэстер, 35% хлопок. Производство: Казахстан.`,
+    `Цвет: ${colorRu}. Ткань: 65% полиэстер, 35% хлопок. Бренд BOTA (Казахстан). Пошив: фабрика-партнёр Songxin.`,
     `Размеры: ${sizes}, все в наличии. Поможем подобрать размер по росту и весу — напишите нам в WhatsApp.`,
     'BOTA Medical Uniform — бренд медицинской одежды из Алматы. Одеваем врачей, медсестёр и студентов-медиков, работаем с клиниками и больницами. Можно заказать один костюм или комплект на всё отделение: размеры, количество и сроки согласуем с вами.',
   ].join('\n\n');
   const en = [
     `${fill(modelEn, trimEn)} Trousers with an elastic waistband. ${sleeveText[item.sleeve][1]}`,
-    `Colour: ${colorEn}. Fabric: 65% polyester, 35% cotton. Made in Kazakhstan.`,
+    `Colour: ${colorEn}. Fabric: 65% polyester, 35% cotton. BOTA brand (Kazakhstan). Sewn by our partner factory Songxin.`,
     `Sizes: ${sizes}, all in stock. We will help you choose a size by height and weight — message us on WhatsApp.`,
     'BOTA Medical Uniform is a medical apparel brand from Almaty. We dress doctors, nurses and medical students and work with clinics and hospitals. Order a single set or a whole department: sizes, quantities and timing are agreed with you.',
   ].join('\n\n');

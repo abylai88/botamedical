@@ -54,7 +54,7 @@ after(async () => { server?.kill(); if (server) await new Promise(resolve => { i
 
 test('server flows, persistence, validation and security boundaries', async t => {
   await t.test('all public pages render, nonce CSP and no private data leak', async () => {
-    for (const path of ['/', '/catalog', '/catalog/bota-coat', '/cart', '/checkout', '/info', '/privacy', '/admin']) {
+    for (const path of ['/', '/catalog', '/catalog/bota-coat', '/cart', '/checkout', '/about', '/about?lang=kk', '/info', '/privacy', '/admin']) {
       const response = await request(path); assert.equal(response.status, 200, path);
       const html = await response.text(); assert.ok(!html.includes(password)); assert.ok(!html.includes('scrypt:'));
       assert.match(response.headers.get('content-security-policy'), /nonce-/);
@@ -69,6 +69,14 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok(!(await (await request('/sitemap.xml')).text()).includes('<url>'));
     // Real contacts by default and a link preview for products.
     assert.ok((await (await request('/info')).text()).includes('993 57 69'));
+    // The brand page: three languages, Kazakh only on request, the partner's figures marked as theirs, linked from the menu.
+    const aboutRu = await (await request('/about')).text();
+    assert.ok(aboutRu.includes('Производственный партнёр') && aboutRu.includes('По данным компании Songxin'), 'About page in Russian');
+    assert.match(aboutRu, /href="\/about"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/about"/, 'Menu marks the brand page');
+    assert.ok((await (await request('/about?lang=kk')).text()).includes('Біз кімбіз'), 'Kazakh version');
+    assert.ok((await (await request('/about?lang=en')).text()).includes('Manufacturing partner'), 'English version');
+    assert.ok((await (await request('/about?lang=xx')).text()).includes('Кто мы'), 'Unknown language falls back to the site language');
+    assert.ok((await (await request('/')).text()).includes('Songxin Garment'), 'Home brand block names the partner');
     const coatPage = await (await request('/catalog/bota-coat')).text();
     assert.match(coatPage, /<meta property="og:title" content="[^"]+"/); assert.match(coatPage, /<meta property="og:image" content="[^"]+"/);
     // A category page has its own subtitle, and the menu marks that category instead of "Каталог".

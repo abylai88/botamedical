@@ -47,7 +47,7 @@ test('public demo works behind an HTTPS host and never accepts private writes', 
       await delay(250);
     }
     assert.ok(ready, 'Demo server must start');
-    for (const path of ['/', '/catalog', '/catalog/bota-coat', '/cart', '/info', '/privacy']) {
+    for (const path of ['/', '/catalog', '/catalog/bota-coat', '/cart', '/about', '/info', '/privacy']) {
       const response = await request(path); assert.equal(response.status, 200, path);
       assert.match(response.headers.get('content-security-policy'), /upgrade-insecure-requests/);
       const html = await response.text(); assert.ok(html.includes('BOTA')); assert.ok(!html.includes('scrypt:'));

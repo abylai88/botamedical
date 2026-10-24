@@ -51,7 +51,7 @@ test('import:scrubs creates products from photos, hides the old category and is 
   assert.equal(scrubs[1].name, 'Хирургический костюм 006 с длинным рукавом, фисташковый');
   assert.equal(scrubs[1].nameEn, 'Surgical scrubs 006, long sleeve, pistachio');
   assert.match(scrubs[0].description, /с голубой отделкой/); assert.match(scrubs[0].description, /65% полиэстер, 35% хлопок/);
-  assert.match(scrubs[0].description, /Производство: Казахстан/); assert.match(scrubs[1].description, /Длинный рукав/);
+  assert.match(scrubs[0].description, /Пошив: фабрика-партнёр Songxin/); assert.match(scrubs[0].descriptionEn, /Sewn by our partner factory Songxin/); assert.match(scrubs[1].description, /Длинный рукав/);
   for (const p of scrubs) {
     assert.equal(p.price, 1800000); assert.equal(p.category, 'Хирургические костюмы'); assert.equal(p.categoryEn, 'Surgical scrubs');
     assert.deepEqual(p.sizes, ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL']); assert.deepEqual(p.colors, []); assert.equal(p.active, true);

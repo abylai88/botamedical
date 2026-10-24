@@ -30,7 +30,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
     <footer className="site-footer">
       <div className="footer-brand"><Link href="/" aria-label={t.nav.home} className="footer-logo"><span className="wordmark" /></Link><p>{text('footer.tagline')}</p></div>
       <nav aria-label={t.footer.nav}><p className="footer-heading">{t.nav.catalog}</p><Link href="/catalog">{t.nav.catalog}</Link><Link href="/catalog?category=Халаты">{t.nav.coats}</Link><Link href={categoryHref(SCRUBS_CATEGORY)}>{t.nav.looks}</Link></nav>
-      <nav aria-label={t.footer.contactsTitle}><p className="footer-heading">{t.footer.contactsTitle}</p><Link href="/info">{t.nav.info}</Link><Link href="/privacy">{t.footer.privacy}</Link>{!demo ? <Link href="/admin">{t.footer.admin}</Link> : null}</nav>
+      <nav aria-label={t.footer.contactsTitle}><p className="footer-heading">{t.footer.contactsTitle}</p><Link href="/about">{t.nav.about}</Link><Link href="/info">{t.nav.info}</Link><Link href="/privacy">{t.footer.privacy}</Link>{!demo ? <Link href="/admin">{t.footer.admin}</Link> : null}</nav>
       <section className="footer-info" aria-labelledby="footer-info-title"><p className="footer-heading" id="footer-info-title">{text('footer.infoTitle')}</p><p className="footer-info-text">{text('footer.infoText')}</p></section>
       <p className="footer-note">{text('footer.note')}</p>
       <p className="footer-copy">© {new Date().getFullYear()} BOTA</p>
