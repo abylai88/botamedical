@@ -59,7 +59,7 @@ export default async function Home() {
 
     <section id="approach" className="editorial-brand">
       <div className="editorial-brand-image"><ProductImage src={photo('brand')} alt={h.brandAlt} quality={90} sizes="(max-width: 760px) 100vw, 55vw" /></div>
-      <div className="editorial-brand-copy"><span className="brand-camel" aria-hidden="true" /><p className="eyebrow">{text('home.brandKicker')}</p><h2>{text('home.brandTitle')}</h2><p>{text('home.brandText')}</p><Link href="/catalog" className="text-link">{text('home.brandCta')}</Link></div>
+      <div className="editorial-brand-copy"><span className="brand-camel" aria-hidden="true" /><p className="eyebrow">{text('home.brandKicker')}</p><h2>{text('home.brandTitle')}</h2><p>{text('home.brandText')}</p><Link href="/about" className="text-link">{text('home.brandCta')}</Link></div>
     </section>
   </>;
 }

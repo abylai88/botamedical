@@ -1,0 +1,179 @@
+/* "О бренде" (/about). One idea carries the page: a sewn seam. It runs from Xiangcheng to Almaty in the
+   opening screen, becomes the partner's timeline, and joins the steps of an order. Everything else stays quiet. */
+.about{--seam:var(--sand);overflow-x:clip}
+.about h2{color:var(--forest)}
+.about :where(h1,h2,h3,p,dd,dt,li,blockquote){overflow-wrap:break-word;hyphens:auto}
+.about dd,.about figure{margin:0}
+
+/* Opening screen */
+.about-hero{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);column-gap:clamp(32px,5vw,80px);align-items:end;background:var(--forest-deep);color:#eef3ef;padding:clamp(28px,3.4vw,44px) var(--gutter) clamp(36px,5vw,64px);isolation:isolate;overflow:hidden}
+.about-langs,.about-route{grid-column:1/-1}
+.about-hero-photo{position:relative;align-self:center;max-width:600px;justify-self:end;transform:rotate(1.5deg)}
+.about-hero-photo img{display:block;width:100%;height:auto;border-radius:10px;border:8px solid #f6f3ec;box-shadow:0 30px 60px -30px rgba(0,0,0,.7)}
+.about-hero-photo figcaption{margin-top:12px;font-size:13px;color:#b8cac1}
+.about-hero::after{content:'';position:absolute;right:-6%;bottom:-18%;width:min(56vw,720px);aspect-ratio:1.45;background:currentColor;opacity:.045;-webkit-mask:url(/brand/bota-camel.png) center/contain no-repeat;mask:url(/brand/bota-camel.png) center/contain no-repeat;z-index:-1}
+.about-langs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:clamp(32px,4.5vw,64px)}
+.about-langs a{padding:7px 14px;border-radius:999px;border:1px solid rgba(217,192,154,.35);font-size:14px;color:#dfe8e3;transition:background .2s,color .2s,border-color .2s}
+.about-langs a:hover{border-color:var(--sand);color:#fff}
+.about-langs a[aria-current]{background:var(--sand);border-color:var(--sand);color:var(--forest-deep);font-weight:600}
+.about-kicker{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.06em;color:var(--sand);margin-bottom:18px}
+.about-hero h1{font-size:clamp(38px,4.9vw,78px);line-height:.98;white-space:pre-line;max-width:17ch;color:#fff;font-stretch:condensed;text-wrap:balance}
+.about-lead{margin-top:26px;max-width:46ch;font-size:clamp(17px,1.5vw,20px);line-height:1.6;color:#cddbd4}
+.about-route{margin-top:clamp(32px,4vw,56px);display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:end;gap:clamp(10px,2vw,24px)}
+.route-end{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#b8cac1}
+.route-end strong{font-family:var(--display);font-weight:600;font-size:clamp(18px,2vw,26px);color:#fff}
+.route-from{padding-bottom:4px}
+.route-to{align-items:flex-end;text-align:right;padding-bottom:40px}
+.route-camel,.contact-camel{display:inline-block;background:currentColor;-webkit-mask:url(/brand/bota-camel.png) center/contain no-repeat;mask:url(/brand/bota-camel.png) center/contain no-repeat}
+.route-to .route-camel{width:46px;height:32px;color:var(--sand);margin-bottom:6px}
+.route-seam{display:block;width:100%;height:auto;overflow:visible}
+.seam-base{fill:none;stroke:rgba(217,192,154,.18);stroke-width:2}
+.seam-stitch{fill:none;stroke:var(--sand);stroke-width:3;stroke-linecap:round;stroke-dasharray:14 11}
+.seam-reveal{fill:none;stroke:#fff;stroke-width:24}
+.seam-knot{fill:var(--forest-deep);stroke:var(--sand);stroke-width:3}
+.seam-knot-end{fill:var(--sand)}
+@media(prefers-reduced-motion:no-preference){
+  .seam-reveal{stroke-dasharray:1;stroke-dashoffset:1;animation:about-sew 2.2s .35s cubic-bezier(.55,.1,.35,1) forwards}
+  .seam-knot-end,.route-to{opacity:0;animation:about-arrive .5s 2.35s ease-out forwards}
+}
+@keyframes about-sew{to{stroke-dashoffset:0}}
+@keyframes about-arrive{to{opacity:1}}
+
+/* Who we are */
+.about-intro{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:clamp(24px,5vw,80px);padding:clamp(56px,8vw,112px) var(--gutter)}
+.about-intro h2{font-size:clamp(30px,3.4vw,48px)}
+.about-intro p{font-size:clamp(18px,1.6vw,22px);line-height:1.6;max-width:62ch;color:#2b3936}
+.about-intro p+p{margin-top:20px;font-size:17px;color:var(--muted)}
+
+/* Partner + care label */
+.about-partner{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:clamp(28px,5vw,72px);align-items:start;background:var(--porcelain);padding:clamp(56px,7vw,96px) var(--gutter)}
+.partner-copy h2{font-size:clamp(32px,4vw,56px);margin-bottom:22px}
+.partner-copy>p{font-size:17px;line-height:1.7;max-width:62ch;color:#33433f}
+.partner-photos{margin-top:36px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px;align-items:end;max-width:760px}
+.partner-photos img{width:100%;height:auto;object-fit:cover;border-radius:12px;background:var(--mist);aspect-ratio:3/2}
+.partner-photos .partner-main{aspect-ratio:796/559}
+.care-label{position:sticky;top:96px;background:#fff;color:var(--ink);border-radius:6px 6px 14px 14px;padding:0 0 22px;box-shadow:0 30px 60px -36px rgba(8,42,38,.45);outline:1.5px dashed var(--stitch);outline-offset:-9px}
+.care-label::before{content:'';position:absolute;left:50%;top:-9px;width:44px;height:18px;margin-left:-22px;border-radius:0 0 22px 22px;background:var(--porcelain)}
+.care-label-head{background:var(--forest);color:var(--sand);font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.03em;padding:24px 26px 18px;border-radius:6px 6px 0 0}
+.care-label dl{padding:6px 26px 0}
+.care-label dl>div{display:flex;flex-direction:column-reverse;gap:2px;padding:14px 0;border-bottom:1px solid var(--line)}
+.care-label dd{font-family:var(--display);font-weight:600;font-size:clamp(24px,2.2vw,30px);color:var(--forest);line-height:1.05;font-variant-numeric:tabular-nums}
+.care-label dt{font-size:14px;line-height:1.45;color:var(--muted)}
+.care-label-note{padding:14px 26px 0;font-size:12px;color:var(--muted)}
+
+/* Timeline as a seam */
+.about-story{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:clamp(24px,5vw,80px);padding:clamp(56px,8vw,112px) var(--gutter)}
+.about-story h2{font-size:clamp(32px,4vw,56px);position:sticky;top:96px;align-self:start}
+.seam-timeline{list-style:none;padding:0;margin:0;position:relative}
+.seam-timeline::before{content:'';position:absolute;left:7px;top:10px;bottom:28px;border-left:3px dashed var(--accent);opacity:.55}
+.seam-timeline li{position:relative;display:grid;grid-template-columns:minmax(96px,150px) minmax(0,1fr);gap:clamp(14px,3vw,36px);padding:0 0 34px 40px;align-items:baseline}
+.seam-timeline li::before{content:'';position:absolute;left:0;top:.55em;width:17px;height:17px;border-radius:50%;background:var(--paper);border:3px solid var(--accent)}
+.seam-year{font-family:var(--display);font-weight:600;font-size:clamp(30px,3.4vw,46px);color:var(--forest);line-height:1;font-variant-numeric:tabular-nums}
+.seam-timeline p{font-size:17px;line-height:1.6;max-width:56ch;color:#33433f}
+.seam-end{padding-bottom:0!important}
+.seam-end::before{background:var(--forest)!important;border-color:var(--forest)!important}
+.seam-end .seam-year{display:inline-flex;align-items:center;gap:10px}
+.seam-end .route-camel{width:42px;height:29px;color:var(--accent)}
+.seam-end p strong{display:block;font-family:var(--display);font-weight:600;font-size:22px;color:var(--forest);margin-bottom:4px}
+
+/* How the clothing is made */
+.about-process{padding:clamp(56px,7vw,96px) var(--gutter);border-top:1px solid var(--line)}
+.process-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:16px 48px;margin-bottom:36px}
+.process-head h2{font-size:clamp(32px,4vw,56px)}
+.process-head p{max-width:44ch;color:var(--muted);font-size:17px;line-height:1.6}
+.process-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px 20px}
+.process-steps li{display:flex;flex-direction:column;gap:8px}
+.process-steps img{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:var(--mist);margin-bottom:8px}
+.process-steps li:not(.has-photo){justify-content:flex-end;background:var(--sand-soft);border-radius:12px;padding:22px;min-height:220px}
+.step-number{font-family:var(--display);font-weight:700;font-size:15px;color:var(--accent);font-variant-numeric:tabular-nums}
+.process-steps li:not(.has-photo) .step-number{font-size:64px;line-height:1;margin-bottom:auto;color:var(--forest);opacity:.85}
+.process-steps h3{font-size:22px;color:var(--forest)}
+.process-steps p{font-size:15px;line-height:1.55;color:var(--muted)}
+
+/* What we offer */
+.about-offer{padding:clamp(56px,7vw,96px) var(--gutter);background:var(--porcelain)}
+.about-offer h2{font-size:clamp(32px,4vw,56px);margin-bottom:32px}
+.offer-columns{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:clamp(24px,5vw,72px)}
+.offer-status{font-weight:600;font-size:14px;color:var(--accent);padding-bottom:12px;border-bottom:1.5px solid var(--forest)}
+.offer-link{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 24px;padding:22px 0;border-bottom:1px solid var(--line);transition:color .2s}
+.offer-link strong{font-family:var(--display);font-weight:600;font-size:clamp(26px,3vw,40px);color:var(--forest);line-height:1.05}
+.offer-link span{color:var(--muted);font-size:15px}
+.offer-link:hover strong{color:var(--accent)}
+.offer-later ul{list-style:none;margin:0;padding:0}
+.offer-later li{padding:16px 0;border-bottom:1px solid var(--line);font-size:18px;color:#33433f}
+.offer-note{margin-top:18px;font-size:15px;color:var(--muted)}
+
+/* For organisations: steps of an order joined by a seam */
+.about-orgs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:clamp(28px,5vw,72px);align-items:center;margin:clamp(40px,6vw,72px) var(--gutter);padding:clamp(36px,5vw,64px);border-radius:22px;background:var(--forest);color:#e6eee9}
+.about-orgs h2{color:#fff;font-size:clamp(32px,4vw,56px);margin-bottom:18px}
+.about-orgs p{font-size:16px;line-height:1.7;max-width:52ch;color:#cddbd4}
+.orgs-steps{list-style:none;margin:0;padding:0;counter-reset:org;position:relative}
+.orgs-steps::before{content:'';position:absolute;left:21px;top:22px;bottom:22px;border-left:2px dashed var(--seam);opacity:.6}
+.orgs-steps li{counter-increment:org;position:relative;display:flex;align-items:center;gap:18px;padding:9px 0;font-family:var(--display);font-weight:600;font-size:clamp(19px,1.8vw,24px);color:#fff}
+.orgs-steps li::before{content:counter(org);flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--forest-deep);border:2px solid var(--sand);color:var(--sand);font-size:17px;position:relative}
+
+/* Principles and quality */
+.about-values{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:clamp(28px,5vw,80px);padding:clamp(56px,8vw,112px) var(--gutter);background:var(--sand-soft)}
+.about-values h2{font-size:clamp(32px,4vw,56px)}
+.values-quote{margin:28px 0 0}
+.values-quote blockquote{font-family:var(--display);font-weight:600;font-size:clamp(26px,2.8vw,38px);line-height:1.15;color:var(--forest-deep);max-width:20ch}
+.values-quote figcaption{margin-top:12px;font-size:14px;color:var(--muted)}
+.quality-note{margin-top:40px;padding-top:24px;border-top:1.5px dashed var(--accent);max-width:52ch}
+.quality-note h3{font-size:22px;color:var(--forest);margin-bottom:10px}
+.quality-note p{font-size:15px;line-height:1.65;color:#3d4a46}
+.quality-note p+p{margin-top:10px;font-weight:600;color:var(--forest)}
+.values-list>div{padding:22px 0;border-bottom:1px solid rgba(134,102,63,.25)}
+.values-list>div:first-child{border-top:1px solid rgba(134,102,63,.25)}
+.values-list dt{font-family:var(--display);font-weight:600;font-size:clamp(21px,2vw,26px);color:var(--forest);margin-bottom:6px}
+.values-list dd{font-size:16px;line-height:1.6;color:#3d4a46;max-width:56ch}
+
+/* Exhibitions and partnerships */
+.about-events{padding:clamp(56px,7vw,96px) var(--gutter)}
+.about-events h2{font-size:clamp(32px,4vw,56px);margin-bottom:32px}
+.about-events ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.about-events li{padding-top:20px;border-top:3px dashed var(--accent)}
+.about-events h3{font-size:22px;line-height:1.15;color:var(--forest)}
+.event-when{margin:10px 0;font-weight:600;font-size:14px;color:var(--accent)}
+.about-events li p:last-child{font-size:15px;line-height:1.6;color:var(--muted)}
+
+/* Contact */
+.about-contact{position:relative;overflow:hidden;background:var(--forest-deep);color:#e6eee9;padding:clamp(56px,8vw,112px) var(--gutter)}
+.contact-camel{width:64px;height:44px;color:var(--sand);margin-bottom:22px}
+.about-contact h2{color:#fff;font-size:clamp(36px,5vw,72px);max-width:16ch}
+.about-contact>p{margin-top:18px;max-width:56ch;font-size:17px;line-height:1.65;color:#cddbd4}
+.contact-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+.contact-wa{background:transparent;border-color:var(--sand);color:var(--sand)}
+.contact-wa:hover{background:var(--sand);border-color:var(--sand);color:var(--forest-deep)}
+.about-contact address{font-style:normal;display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:36px;padding-top:22px;border-top:1px solid rgba(255,255,255,.14);font-size:15px;color:#b8cac1}
+.about-contact address a{text-decoration:underline;text-underline-offset:3px}
+.about-contact address a:hover{color:#fff}
+.about :focus-visible{outline-color:var(--sand)}
+.about-intro :focus-visible,.about-partner :focus-visible,.about-story :focus-visible,.about-process :focus-visible,.about-offer :focus-visible,.about-values :focus-visible,.about-events :focus-visible{outline-color:var(--pulse)}
+
+@media(max-width:1100px){
+  .process-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .about-partner{grid-template-columns:1fr}
+  .care-label{position:relative;top:0;max-width:520px}
+}
+@media(max-width:860px){
+  .about-intro,.about-story,.about-values,.about-orgs,.offer-columns{grid-template-columns:1fr}
+  .about-story h2{position:static}
+  .about-events ul{grid-template-columns:1fr}
+  .about-orgs{padding:32px 22px}
+  .about-hero{grid-template-columns:1fr}
+  .about-hero-photo{justify-self:start;margin-top:32px;max-width:440px;transform:none}
+  .about-route{grid-template-columns:1fr 1fr;row-gap:10px}
+  .route-seam{grid-column:1/-1;grid-row:1}
+  .route-from{grid-row:2}
+  .route-to{grid-row:2;padding-bottom:4px;flex-direction:column}
+  .route-to .route-camel{display:none}
+  .seam-timeline li{grid-template-columns:1fr;gap:6px;padding-left:36px}
+  .contact-actions .button{flex:1 1 220px}
+}
+@media(max-width:600px){
+  .process-steps{grid-template-columns:1fr}
+  .process-steps li:not(.has-photo){min-height:0}
+  .process-steps li:not(.has-photo) .step-number{font-size:44px;margin-bottom:14px}
+  .partner-photos{gap:8px}
+  .about-hero-photo{display:none}
+}

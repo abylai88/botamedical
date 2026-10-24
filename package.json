@@ -15,6 +15,7 @@
     "key:create": "node scripts/order-key.mjs",
     "db:verify": "node --conditions=react-server scripts/db-verify.mjs",
     "import:scrubs": "node --conditions=react-server scripts/import-scrubs.mjs",
+    "fix:origin": "node --conditions=react-server scripts/fix-origin.mjs",
     "assets": "node scripts/assets.mjs",
     "test": "node --conditions=react-server --test tests/*.test.mjs",
     "test:deploy": "bash deploy/tests/run.sh"

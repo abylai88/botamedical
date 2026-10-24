@@ -7,6 +7,6 @@ export const dynamic = 'force-dynamic';
 export default function sitemap(): MetadataRoute.Sitemap {
   if (!indexable()) return [];
   const origin = appOrigin();
-  const pages = ['/', '/catalog', categoryHref(COATS_CATEGORY), categoryHref(SCRUBS_CATEGORY), '/info', '/privacy'];
+  const pages = ['/', '/catalog', categoryHref(COATS_CATEGORY), categoryHref(SCRUBS_CATEGORY), '/about', '/info', '/privacy'];
   return [...pages.map(path => ({ url: origin + path })), ...products().map(p => ({ url: `${origin}/catalog/${p.id}` }))];
 }
