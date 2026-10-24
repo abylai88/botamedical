@@ -28,10 +28,11 @@ const ru = {
   switchLabel: 'Язык страницы',
   hero: {
     kicker: 'BOTA Medical Uniform',
-    title: 'Доверие — через качество.\nЦенность — через сотрудничество.',
+    title: 'Доверие\u00a0— через качество.\nЦенность\u00a0— через сотрудничество.',
     lead: 'Мы опираемся на профессиональный производственный опыт и работаем для медицины Казахстана.',
     from: 'Сянчэн, Хэнань', fromNote: 'производство', to: 'Алматы', toNote: 'бренд и сервис',
     routeLabel: 'Путь одежды: от фабрики в Сянчэне до BOTA в Алматы',
+    photoAlt: 'Швейный цех фабрики Songxin: ряды машин и белые халаты в работе', photoCaption: 'Швейный цех фабрики-партнёра Songxin, Сянчэн',
   },
   intro: {
     title: 'Кто мы',
@@ -44,7 +45,6 @@ const ru = {
     title: 'Производственный партнёр',
     text: 'Наш партнёр — Songxin Garment Co., Ltd. из города Сянчэн, провинция Хэнань, Китай. С 2003 года фабрика проектирует и шьёт профессиональную одежду для медиков, рабочую одежду и текстиль. BOTA соединяет опыт партнёра с реальными задачами клиентов в Казахстане.',
     buildingAlt: 'Здание фабрики Songxin в Сянчэне',
-    hallAlt: 'Швейный цех фабрики Songxin',
     rollsAlt: 'Рулоны ткани на складе фабрики',
   },
   label: {
@@ -80,12 +80,12 @@ const ru = {
       ['Проект и лекала', 'Дизайнеры и специалисты CAD разрабатывают модель и лекала.', null],
       ['Материалы', 'Ткани и фурнитуру закупают и проверяют их качество.', 'fabricShelves'],
       ['Раскрой', 'Автоматические настилочные машины и шаблонное оборудование готовят и кроят ткань.', 'cutting'],
-      ['Пошив', 'Компьютерные петельные машины, закрепочные и пуговичные автоматы.', 'sewingLine'],
+      ['Пошив', 'Компьютерные петельные машины, закрепочные и пуговичные автоматы.', 'sewingHall'],
       ['Контроль качества', 'Во время производства проходит промежуточная проверка качества.', null],
       ['Утюжка и упаковка', 'Финишная обработка, утюжка и упаковка изделий.', 'pressing'],
       ['Склад и отгрузка', 'Готовые изделия хранятся на складе и отправляются заказчику.', 'finished'],
     ] as [string, string, AboutPhoto | null][],
-    alts: { fabricShelves: 'Стеллажи с тканями разных цветов', cutting: 'Автоматический раскрой ткани и детали кроя', sewingLine: 'Швеи за машинами в цехе', pressing: 'Утюжка готовых изделий', finished: 'Готовая одежда на вешалах в цехе' } as Partial<Record<AboutPhoto, string>>,
+    alts: { fabricShelves: 'Стеллажи с тканями разных цветов', cutting: 'Автоматический раскрой ткани и детали кроя', sewingHall: 'Швеи за машинами в цехе', pressing: 'Утюжка готовых изделий', finished: 'Готовая одежда на вешалах в цехе' } as Partial<Record<AboutPhoto, string>>,
   },
   products: {
     title: 'Что мы предлагаем',
@@ -138,10 +138,11 @@ const kk: AboutCopy = {
   switchLabel: 'Бет тілі',
   hero: {
     kicker: 'BOTA Medical Uniform',
-    title: 'Сапа арқылы — сенім.\nЫнтымақтастық арқылы — құндылық.',
+    title: 'Сапа арқылы\u00a0— сенім.\nЫнтымақтастық арқылы\u00a0— құндылық.',
     lead: 'Кәсіби өндірістік тәжірибеге сүйене отырып, Қазақстанның медициналық қажеттіліктеріне қызмет көрсетеміз.',
     from: 'Сянчэн, Хэнань', fromNote: 'өндіріс', to: 'Алматы', toNote: 'бренд және қызмет',
     routeLabel: 'Киімнің жолы: Сянчэндегі фабрикадан Алматыдағы BOTA-ға дейін',
+    photoAlt: 'Songxin фабрикасының тігін цехы: машиналар қатары және тігіліп жатқан ақ халаттар', photoCaption: 'Серіктес Songxin фабрикасының тігін цехы, Сянчэн',
   },
   intro: {
     title: 'Біз кімбіз',
@@ -154,7 +155,6 @@ const kk: AboutCopy = {
     title: 'Өндірістік серіктес',
     text: 'Біздің серіктесіміз — Қытайдың Хэнань провинциясы, Сянчэн қаласындағы Songxin Garment Co., Ltd. Кәсіпорын 2003 жылдан бері медицина қызметкерлеріне арналған кәсіби киімді, жұмыс киімін және тоқыма бұйымдарын жобалап, өндіреді. BOTA серіктестің тәжірибесін Қазақстандағы клиенттердің нақты қажеттіліктерімен ұштастырады.',
     buildingAlt: 'Сянчэндегі Songxin фабрикасының ғимараты',
-    hallAlt: 'Songxin фабрикасының тігін цехы',
     rollsAlt: 'Фабрика қоймасындағы мата орамдары',
   },
   label: {
@@ -190,12 +190,12 @@ const kk: AboutCopy = {
       ['Жобалау және пішім', 'Дизайнерлер мен CAD мамандары үлгі мен пішімді әзірлейді.', null],
       ['Материалдар', 'Маталар мен қосалқы материалдар сатып алынып, сапасы тексеріледі.', 'fabricShelves'],
       ['Пішу', 'Матаны автоматты жаю құрылғылары мен шаблондық жабдықтар дайындап, пішеді.', 'cutting'],
-      ['Тігу', 'Компьютерлік ілмек тігу машиналары, бекіту және түйме қадау жабдықтары.', 'sewingLine'],
+      ['Тігу', 'Компьютерлік ілмек тігу машиналары, бекіту және түйме қадау жабдықтары.', 'sewingHall'],
       ['Сапа бақылауы', 'Өндіріс барысында аралық сапа тексерісі жүргізіледі.', null],
       ['Үтіктеу және қаптау', 'Соңғы өңдеу, үтіктеу және бұйымдарды қаптау.', 'pressing'],
       ['Қойма және жөнелту', 'Дайын бұйымдар қоймада сақталып, тапсырыс берушіге жөнелтіледі.', 'finished'],
     ],
-    alts: { fabricShelves: 'Түрлі түсті маталар салынған сөрелер', cutting: 'Матаны автоматты пішу және пішілген бөлшектер', sewingLine: 'Цехтағы тігінші машиналар', pressing: 'Дайын бұйымдарды үтіктеу', finished: 'Цехтағы ілгіштерде тұрған дайын киім' },
+    alts: { fabricShelves: 'Түрлі түсті маталар салынған сөрелер', cutting: 'Матаны автоматты пішу және пішілген бөлшектер', sewingHall: 'Цехтағы тігінші машиналар', pressing: 'Дайын бұйымдарды үтіктеу', finished: 'Цехтағы ілгіштерде тұрған дайын киім' },
   },
   products: {
     title: 'Өнімдер',
@@ -251,6 +251,7 @@ const en: AboutCopy = {
     lead: 'We draw on proven manufacturing experience to serve the medical needs of Kazakhstan.',
     from: 'Xiangcheng, Henan', fromNote: 'manufacturing', to: 'Almaty', toNote: 'brand and service',
     routeLabel: 'The route of our clothing: from the factory in Xiangcheng to BOTA in Almaty',
+    photoAlt: 'Sewing hall at the Songxin factory: rows of machines and white coats in progress', photoCaption: 'Sewing hall at our partner factory Songxin, Xiangcheng',
   },
   intro: {
     title: 'Who we are',
@@ -263,7 +264,6 @@ const en: AboutCopy = {
     title: 'Manufacturing partner',
     text: 'Our partner is Songxin Garment Co., Ltd. of Xiangcheng, Henan Province, China. Since 2003 the factory has designed and made professional clothing for medical staff, workwear and textiles. BOTA brings that experience to the real needs of customers in Kazakhstan.',
     buildingAlt: 'The Songxin factory building in Xiangcheng',
-    hallAlt: 'A sewing hall at the Songxin factory',
     rollsAlt: 'Rolls of fabric in the factory store',
   },
   label: {
@@ -299,12 +299,12 @@ const en: AboutCopy = {
       ['Design and patterns', 'Designers and CAD specialists develop the style and its patterns.', null],
       ['Materials', 'Fabrics and trims are purchased and checked for quality.', 'fabricShelves'],
       ['Cutting', 'Automatic spreading machines and template equipment prepare and cut the fabric.', 'cutting'],
-      ['Sewing', 'Computerised buttonhole machines, bar-tacking and button-sewing equipment.', 'sewingLine'],
+      ['Sewing', 'Computerised buttonhole machines, bar-tacking and button-sewing equipment.', 'sewingHall'],
       ['Quality checks', 'Work is inspected during production.', null],
       ['Pressing and packing', 'Finishing, pressing and packing.', 'pressing'],
       ['Storage and dispatch', 'Finished garments are stored and shipped to the customer.', 'finished'],
     ],
-    alts: { fabricShelves: 'Shelves of fabric in many colours', cutting: 'Automatic fabric cutting and cut pieces', sewingLine: 'Machinists at work in the sewing hall', pressing: 'Pressing finished garments', finished: 'Finished clothing on rails in the workshop' },
+    alts: { fabricShelves: 'Shelves of fabric in many colours', cutting: 'Automatic fabric cutting and cut pieces', sewingHall: 'Machinists at work in the sewing hall', pressing: 'Pressing finished garments', finished: 'Finished clothing on rails in the workshop' },
   },
   products: {
     title: 'What we offer',

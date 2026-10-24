@@ -26,9 +26,9 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   };
 }
 
-function Photo({ name, alt, sizes, className }: { name: AboutPhoto; alt: string; sizes: string; className?: string }) {
+function Photo({ name, alt, sizes, className, priority }: { name: AboutPhoto; alt: string; sizes: string; className?: string; priority?: boolean }) {
   const p = ABOUT_PHOTOS[name];
-  return <Image src={p.src} alt={alt} width={p.width} height={p.height} sizes={sizes} className={className} />;
+  return <Image src={p.src} alt={alt} width={p.width} height={p.height} sizes={sizes} className={className} priority={priority} />;
 }
 
 export default async function About({ searchParams }: Props) {
@@ -38,9 +38,15 @@ export default async function About({ searchParams }: Props) {
       <nav className="about-langs" aria-label={c.switchLabel}>
         {ABOUT_LANGS.map(code => <Link key={code} href={href(code)} lang={code} hrefLang={code} aria-current={code === lang ? 'true' : undefined} scroll={false}>{ABOUT_LANG_NAMES[code]}</Link>)}
       </nav>
-      <p className="about-kicker">{c.hero.kicker}</p>
-      <h1 id="about-title">{c.hero.title}</h1>
-      <p className="about-lead">{c.hero.lead}</p>
+      <div className="about-hero-copy">
+        <p className="about-kicker">{c.hero.kicker}</p>
+        <h1 id="about-title">{c.hero.title}</h1>
+        <p className="about-lead">{c.hero.lead}</p>
+      </div>
+      <figure className="about-hero-photo">
+        <Photo name="sewingLine" alt={c.hero.photoAlt} sizes="(max-width: 860px) 90vw, 36vw" priority />
+        <figcaption>{c.hero.photoCaption}</figcaption>
+      </figure>
       <figure className="about-route" role="img" aria-label={c.hero.routeLabel}>
         <span className="route-end route-from" aria-hidden="true"><strong>{c.hero.from}</strong><span>{c.hero.fromNote}</span></span>
         {/* A seam stitched from Xiangcheng to Almaty: drawn once on load, static with reduced motion. */}
@@ -65,8 +71,7 @@ export default async function About({ searchParams }: Props) {
         <p>{c.partner.text}</p>
         <div className="partner-photos">
           <Photo name="building" alt={c.partner.buildingAlt} sizes="(max-width: 860px) 100vw, 560px" className="partner-main" />
-          <Photo name="sewingHall" alt={c.partner.hallAlt} sizes="(max-width: 860px) 50vw, 280px" />
-          <Photo name="fabricRolls" alt={c.partner.rollsAlt} sizes="(max-width: 860px) 50vw, 280px" />
+          <Photo name="fabricRolls" alt={c.partner.rollsAlt} sizes="(max-width: 860px) 40vw, 280px" />
         </div>
       </div>
       <aside className="care-label" aria-labelledby="label-title">
