@@ -31,7 +31,7 @@ export const EXPO_PHOTOS = {
   scrubs: { src: '/images/expo/scrubs.webp', width: 900, height: 1600 },
   talks: { src: '/images/expo/talks.webp', width: 1600, height: 900 },
   coats: { src: '/images/expo/coats.webp', width: 900, height: 1600 },
-  standLight: { src: '/images/expo/stand-light.webp', width: 1600, height: 916 },
+  talksDesk: { src: '/images/expo/talks-desk.webp', width: 1600, height: 916 },
   samples: { src: '/images/expo/samples.webp', width: 900, height: 1600 },
   visitors: { src: '/images/expo/visitors.webp', width: 1600, height: 900 },
   bag: { src: '/images/expo/bag.webp', width: 1200, height: 1600 },
@@ -142,7 +142,7 @@ const ru = {
       'На выставке мы познакомились с академиком Абаем Кабатулы Байгенжиным, доктором медицинских наук и профессором. Во время поездки команда также посетила клиники Astana Green Clinic, Uniserv Medical Center и Ainalayon Koz Medical Center.',
     ],
     open: 'Открыть фото',
-    alts: { stand: 'Стенд BOTA B26: халаты и хирургические костюмы', meeting: 'Встреча на стенде BOTA', banner: 'У баннера United Medical Expo 2026', scrubs: 'Хирургические костюмы на стенде', talks: 'Переговоры на выставке', coats: 'Медицинские халаты BOTA на вешалах', standLight: 'Стенд BOTA с коллекцией', samples: 'Образцы на стенде BOTA', visitors: 'Посетители у стенда BOTA', bag: 'Фирменный пакет BOTA', coatDetail: 'Халат BOTA крупным планом' } as Record<ExpoPhoto, string>,
+    alts: { stand: 'Стенд BOTA B26: халаты и хирургические костюмы', meeting: 'Встреча на стенде BOTA', banner: 'У баннера United Medical Expo 2026', scrubs: 'Хирургические костюмы на стенде', talks: 'Встреча с партнёрами на выставке', coats: 'Медицинские халаты BOTA на вешалах', talksDesk: 'Переговоры за столом на выставке', samples: 'Образцы на стенде BOTA', visitors: 'Посетители у стенда BOTA', bag: 'Фирменный пакет BOTA', coatDetail: 'Халат BOTA крупным планом' } as Record<ExpoPhoto, string>,
   },
   events: {
     title: 'Выставки и сотрудничество',
@@ -262,7 +262,7 @@ const kk: AboutCopy = {
       'Көрмеде медицина ғылымдарының докторы, профессор, академик Абай Қабатұлы Байгенжинмен таныстық. Сапар барысында команда Astana Green Clinic, Uniserv Medical Center және Ainalayon Koz Medical Center клиникаларында болды.',
     ],
     open: 'Фотоны ашу',
-    alts: { stand: 'BOTA B26 стенді: халаттар мен хирургиялық киімдер', meeting: 'BOTA стендіндегі кездесу', banner: 'United Medical Expo 2026 баннері жанында', scrubs: 'Стендтегі хирургиялық киімдер', talks: 'Көрмедегі келіссөздер', coats: 'Ілгіштердегі BOTA медициналық халаттары', standLight: 'Коллекция қойылған BOTA стенді', samples: 'BOTA стендіндегі үлгілер', visitors: 'BOTA стендіне келушілер', bag: 'BOTA фирмалық пакеті', coatDetail: 'BOTA халаты жақыннан' },
+    alts: { stand: 'BOTA B26 стенді: халаттар мен хирургиялық киімдер', meeting: 'BOTA стендіндегі кездесу', banner: 'United Medical Expo 2026 баннері жанында', scrubs: 'Стендтегі хирургиялық киімдер', talks: 'Көрмедегі серіктестермен кездесу', coats: 'Ілгіштердегі BOTA медициналық халаттары', talksDesk: 'Көрмедегі келіссөздер', samples: 'BOTA стендіндегі үлгілер', visitors: 'BOTA стендіне келушілер', bag: 'BOTA фирмалық пакеті', coatDetail: 'BOTA халаты жақыннан' },
   },
   events: {
     title: 'Көрмелер және ынтымақтастық',
@@ -381,7 +381,7 @@ const en: AboutCopy = {
       'At the exhibition we met Academician Abay Kabatuly Baigenzhin, Doctor of Medical Sciences and professor. During the trip the team also visited Astana Green Clinic, Uniserv Medical Center and Ainalayon Koz Medical Center.',
     ],
     open: 'Open photo',
-    alts: { stand: 'BOTA stand B26 with coats and surgical scrubs', meeting: 'A meeting at the BOTA stand', banner: 'At the United Medical Expo 2026 banner', scrubs: 'Surgical scrubs on the stand', talks: 'Talks at the exhibition', coats: 'BOTA medical coats on a rail', standLight: 'The BOTA stand with the collection', samples: 'Samples on the BOTA stand', visitors: 'Visitors at the BOTA stand', bag: 'BOTA branded bag', coatDetail: 'A BOTA coat up close' },
+    alts: { stand: 'BOTA stand B26 with coats and surgical scrubs', meeting: 'A meeting at the BOTA stand', banner: 'At the United Medical Expo 2026 banner', scrubs: 'Surgical scrubs on the stand', talks: 'Meeting partners at the exhibition', coats: 'BOTA medical coats on a rail', talksDesk: 'Talks at the table during the exhibition', samples: 'Samples on the BOTA stand', visitors: 'Visitors at the BOTA stand', bag: 'BOTA branded bag', coatDetail: 'A BOTA coat up close' },
   },
   events: {
     title: 'Exhibitions and partnerships',
