@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getLocale } from '@/lib/locale';
-import { ABOUT, ABOUT_LANGS, ABOUT_LANG_NAMES, ABOUT_PHOTOS, toAboutLang, type AboutPhoto } from '@/lib/about';
+import { ABOUT, ABOUT_LANGS, ABOUT_LANG_NAMES, ABOUT_PHOTOS, EXPO_PHOTOS, toAboutLang, type AboutPhoto, type ExpoPhoto } from '@/lib/about';
 import { COATS_CATEGORY, SCRUBS_CATEGORY, categoryHref } from '@/lib/categories';
 import { COMPANY } from '@/lib/company';
 import { getSiteContent, whatsappLink } from '@/lib/site';
@@ -131,6 +131,24 @@ export default async function About({ searchParams }: Props) {
         <div className="quality-note"><h3>{c.quality.title}</h3><p>{c.quality.text}</p><p>{c.quality.iso}</p></div>
       </div>
       <dl className="values-list">{c.values.items.map(([name, text]) => <div key={name}><dt>{name}</dt><dd>{text}</dd></div>)}</dl>
+    </section>
+
+    <section className="about-expo" id="expo" aria-labelledby="expo-title">
+      <div className="expo-copy">
+        <h2 id="expo-title">{c.expo.title}</h2>
+        <p className="expo-when">{c.expo.when}</p>
+        {c.expo.text.map((p, i) => <p key={i}>{p}</p>)}
+      </div>
+      <ul className="expo-gallery">
+        {(Object.keys(EXPO_PHOTOS) as ExpoPhoto[]).map(key => {
+          const p = EXPO_PHOTOS[key]; const alt = c.expo.alts[key];
+          return <li key={key} className={p.width > p.height ? 'expo-wide' : 'expo-tall'}>
+            <a href={p.src} target="_blank" rel="noopener" aria-label={`${c.expo.open}: ${alt}`}>
+              <Image src={p.src} alt={alt} width={p.width} height={p.height} sizes={p.width > p.height ? '(max-width: 600px) 100vw, 40vw' : '(max-width: 600px) 50vw, 20vw'} />
+            </a>
+          </li>;
+        })}
+      </ul>
     </section>
 
     <section className="about-events" aria-labelledby="events-title">

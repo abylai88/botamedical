@@ -23,6 +23,22 @@ export const ABOUT_PHOTOS = {
 } as const;
 export type AboutPhoto = keyof typeof ABOUT_PHOTOS;
 
+// Photos from United Medical Expo 2026 (Astana, 28–29 October), supplied by the owner; people shown agreed to publication.
+export const EXPO_PHOTOS = {
+  stand: { src: '/images/expo/stand.webp', width: 1600, height: 1205 },
+  meeting: { src: '/images/expo/meeting.webp', width: 900, height: 1600 },
+  banner: { src: '/images/expo/banner.webp', width: 1329, height: 857 },
+  scrubs: { src: '/images/expo/scrubs.webp', width: 900, height: 1600 },
+  talks: { src: '/images/expo/talks.webp', width: 1600, height: 900 },
+  coats: { src: '/images/expo/coats.webp', width: 900, height: 1600 },
+  standLight: { src: '/images/expo/stand-light.webp', width: 1600, height: 916 },
+  samples: { src: '/images/expo/samples.webp', width: 900, height: 1600 },
+  visitors: { src: '/images/expo/visitors.webp', width: 1600, height: 900 },
+  bag: { src: '/images/expo/bag.webp', width: 1200, height: 1600 },
+  coatDetail: { src: '/images/expo/coat-detail.webp', width: 900, height: 1600 },
+} as const;
+export type ExpoPhoto = keyof typeof EXPO_PHOTOS;
+
 const ru = {
   meta: { title: 'О бренде', description: 'BOTA Medical Uniform — медицинская одежда из Алматы. Производственный партнёр — фабрика Songxin (Сянчэн, Хэнань), работает с 2003 года.' },
   switchLabel: 'Язык страницы',
@@ -117,11 +133,21 @@ const ru = {
       ['Взаимная выгода', 'Поддерживаем общий рост клиентов, поставщиков и деловых партнёров.'],
     ],
   },
+  expo: {
+    title: 'United Medical Expo 2026',
+    when: '28–29 октября 2026, Астана, МВЦ EXPO, стенд B26',
+    text: [
+      'В октябре BOTA представила свою коллекцию на международной медицинской выставке United Medical Expo в Астане. На стенде B26 мы показали медицинские халаты и хирургические костюмы.',
+      'Компанию представляли директор BOTA Нуржан Алгыр, а также Юань Шуай и Лю Хайтао — руководители нашего производственного партнёра, фабрики Songxin.',
+      'На выставке мы познакомились с академиком Абаем Кабатулы Байгенжиным, доктором медицинских наук и профессором. Во время поездки команда также посетила клиники Astana Green Clinic, Uniserv Medical Center и Ainalayon Koz Medical Center.',
+    ],
+    open: 'Открыть фото',
+    alts: { stand: 'Стенд BOTA B26: халаты и хирургические костюмы', meeting: 'Встреча на стенде BOTA', banner: 'У баннера United Medical Expo 2026', scrubs: 'Хирургические костюмы на стенде', talks: 'Переговоры на выставке', coats: 'Медицинские халаты BOTA на вешалах', standLight: 'Стенд BOTA с коллекцией', samples: 'Образцы на стенде BOTA', visitors: 'Посетители у стенда BOTA', bag: 'Фирменный пакет BOTA', coatDetail: 'Халат BOTA крупным планом' } as Record<ExpoPhoto, string>,
+  },
   events: {
     title: 'Выставки и сотрудничество',
     items: [
-      ['Международная медицинская выставка KIHE', 'Участвуем', 'Встречи с медицинскими организациями, специалистами по закупкам и будущими партнёрами.'],
-      ['United Medical Expo 2026', '28–29 октября 2026, Астана, МВЦ EXPO', 'Участвуем: показываем медицинскую одежду и расширяем сеть дистрибьюторов.'],
+      ['Международная медицинская выставка KIHE', 'Планируем участие', 'Встречи с медицинскими организациями, специалистами по закупкам и будущими партнёрами.'],
       ['Казахский национальный медицинский университет (КазНМУ)', 'Сотрудничество', 'Развиваем сотрудничество с университетом и его клиниками.'],
     ],
   },
@@ -227,11 +253,21 @@ const kk: AboutCopy = {
       ['Өзара тиімді ынтымақтастық', 'Клиенттердің, жеткізу серіктестерінің және іскерлік серіктестердің ортақ дамуын қолдаймыз.'],
     ],
   },
+  expo: {
+    title: 'United Medical Expo 2026',
+    when: '2026 жылғы 28–29 қазан, Астана, EXPO халықаралық көрме орталығы, B26 стенді',
+    text: [
+      'Қазан айында BOTA Астанадағы United Medical Expo халықаралық медициналық көрмесінде өз коллекциясын таныстырды. B26 стендінде медициналық ақ халаттар мен хирургиялық киімдерді көрсеттік.',
+      'Компанияны BOTA директоры Нуржан Алгыр, сондай-ақ өндірістік серіктесіміз Songxin фабрикасының басшылары Юань Шуай мен Лю Хайтао таныстырды.',
+      'Көрмеде медицина ғылымдарының докторы, профессор, академик Абай Қабатұлы Байгенжинмен таныстық. Сапар барысында команда Astana Green Clinic, Uniserv Medical Center және Ainalayon Koz Medical Center клиникаларында болды.',
+    ],
+    open: 'Фотоны ашу',
+    alts: { stand: 'BOTA B26 стенді: халаттар мен хирургиялық киімдер', meeting: 'BOTA стендіндегі кездесу', banner: 'United Medical Expo 2026 баннері жанында', scrubs: 'Стендтегі хирургиялық киімдер', talks: 'Көрмедегі келіссөздер', coats: 'Ілгіштердегі BOTA медициналық халаттары', standLight: 'Коллекция қойылған BOTA стенді', samples: 'BOTA стендіндегі үлгілер', visitors: 'BOTA стендіне келушілер', bag: 'BOTA фирмалық пакеті', coatDetail: 'BOTA халаты жақыннан' },
+  },
   events: {
     title: 'Көрмелер және ынтымақтастық',
     items: [
-      ['KIHE халықаралық медициналық көрмесі', 'Қатысамыз', 'Медициналық ұйымдармен, сатып алу мамандарымен және әлеуетті серіктестермен кездесу.'],
-      ['United Medical Expo 2026', '2026 жылғы 28–29 қазан, Астана, EXPO халықаралық көрме орталығы', 'Қатысамыз: медициналық киімді таныстырып, дистрибьюторлық желіні кеңейтеміз.'],
+      ['KIHE халықаралық медициналық көрмесі', 'Қатысуды жоспарлаймыз', 'Медициналық ұйымдармен, сатып алу мамандарымен және әлеуетті серіктестермен кездесу.'],
       ['Қазақ ұлттық медицина университеті (KazNMU)', 'Ынтымақтастық', 'Университетпен және оның клиникаларымен ынтымақтастықты дамытамыз.'],
     ],
   },
@@ -336,11 +372,21 @@ const en: AboutCopy = {
       ['Mutual benefit', 'Supporting the shared growth of customers, suppliers and business partners.'],
     ],
   },
+  expo: {
+    title: 'United Medical Expo 2026',
+    when: '28–29 October 2026, Astana, EXPO International Exhibition Centre, stand B26',
+    text: [
+      'In October BOTA presented its collection at United Medical Expo, the international medical exhibition in Astana. At stand B26 we showed medical coats and surgical scrubs.',
+      'BOTA was represented by director Nurjan Alger, together with Yuan Shuai and Liu Haitao, heads of our manufacturing partner, the Songxin factory.',
+      'At the exhibition we met Academician Abay Kabatuly Baigenzhin, Doctor of Medical Sciences and professor. During the trip the team also visited Astana Green Clinic, Uniserv Medical Center and Ainalayon Koz Medical Center.',
+    ],
+    open: 'Open photo',
+    alts: { stand: 'BOTA stand B26 with coats and surgical scrubs', meeting: 'A meeting at the BOTA stand', banner: 'At the United Medical Expo 2026 banner', scrubs: 'Surgical scrubs on the stand', talks: 'Talks at the exhibition', coats: 'BOTA medical coats on a rail', standLight: 'The BOTA stand with the collection', samples: 'Samples on the BOTA stand', visitors: 'Visitors at the BOTA stand', bag: 'BOTA branded bag', coatDetail: 'A BOTA coat up close' },
+  },
   events: {
     title: 'Exhibitions and partnerships',
     items: [
-      ['KIHE international healthcare exhibition', 'We take part', 'Meeting medical organisations, procurement specialists and future partners.'],
-      ['United Medical Expo 2026', '28–29 October 2026, Astana, EXPO International Exhibition Centre', 'We take part: presenting our medical clothing and growing our distributor network.'],
+      ['KIHE international healthcare exhibition', 'Planned', 'Meeting medical organisations, procurement specialists and future partners.'],
       ['Kazakh National Medical University (KazNMU)', 'Cooperation', 'We are developing cooperation with the university and its clinics.'],
     ],
   },

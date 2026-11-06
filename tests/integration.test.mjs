@@ -74,6 +74,7 @@ test('server flows, persistence, validation and security boundaries', async t =>
     assert.ok(aboutRu.includes('Производственный партнёр') && aboutRu.includes('По данным компании Songxin'), 'About page in Russian');
     assert.match(aboutRu, /href="\/about"[^>]*aria-current="page"|aria-current="page"[^>]*href="\/about"/, 'Menu marks the brand page');
     assert.ok((await (await request('/about?lang=kk')).text()).includes('Біз кімбіз'), 'Kazakh version');
+    assert.ok(aboutRu.includes('стенд B26') && aboutRu.includes('/images/expo/stand.webp'), 'Expo report with photos');
     assert.ok((await (await request('/about?lang=en')).text()).includes('Manufacturing partner'), 'English version');
     assert.ok((await (await request('/about?lang=xx')).text()).includes('Кто мы'), 'Unknown language falls back to the site language');
     assert.ok((await (await request('/')).text()).includes('Songxin Garment'), 'Home brand block names the partner');
